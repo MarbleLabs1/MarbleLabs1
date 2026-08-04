@@ -50,6 +50,7 @@ no single story can show, and the one an employer cannot explain away as a perso
 | What gets published | `src/lib/moderation.ts` | Runs before anything is written. Blocks named individuals and contact details; flags allegations for human review. |
 | Every SQL query | `src/lib/db.ts` | All of it, in one file, so the eventual Postgres migration is a one-file job. |
 | Pricing and entitlements | `src/lib/billing.ts` | Plans, Stripe wiring, HMAC-signed access cookies. |
+| Moderator access | `src/lib/admin-token.ts` | Token and session crypto, free of Next imports so it is unit-testable. Fails closed. |
 
 ---
 
@@ -122,9 +123,32 @@ anyone, no account, no subscription. Three independent reports hide a story pend
 Posters are never asked for an email and their IP is never stored, only a salted hash of it. We
 cannot tell a company who posted something because we do not know.
 
-**Still missing before this goes live for real:** a human moderation queue with an admin UI (flagged
-stories currently sit in `status='review'` with no way to action them from the app), a published
-takedown contact, and a lawyer's read of the guidelines in your jurisdiction.
+### The moderation queue
+
+Screening decides what gets *written*; a person decides what stays. `/admin` is where flagged
+stories get resolved, and without it the `review` status is a black hole — stories go in and nothing
+comes out.
+
+Two things land in the queue: stories screening held (an allegation of unlawful conduct, which is
+sometimes exactly what happened and never something to publish on autopilot), and published stories
+readers have reported. Three *distinct* reporters auto-hide a story pending review — distinct,
+because otherwise one determined person can bury any story they dislike, and there is a test
+asserting they cannot.
+
+A moderator sees the full story, the screening findings, and every report with its detail, then
+publishes or removes. **Removals require a written reason**, and every decision is appended to
+`moderation_log` with the status transition — an unauditable moderation system is
+indistinguishable from censorship, and the log is what you show when someone asks why their story
+went. Approving also clears the reports, or the story returns to the queue forever.
+
+Access is a single shared token in `LINKEDOUT_ADMIN_TOKEN`, compared in constant time, exchanged for
+an HMAC-signed 12-hour cookie. **Leave it unset and `/admin` 404s** — an admin surface with no
+password because someone forgot an env var is how moderation tools end up publicly writable. Right
+for one or two moderators; at five you want per-moderator accounts so the log records *who* decided.
+Rotating `LINKEDOUT_SALT` signs everyone out, which is the fast revoke.
+
+**Still missing before this goes live for real:** a published takedown contact, and a lawyer's read
+of the guidelines in your jurisdiction.
 
 ---
 
@@ -144,22 +168,28 @@ npm run dev          # dev server
 npm run build        # production build
 npm run seed         # add example data
 npm run seed:reset   # wipe, then add example data
-npm test             # unit tests — moderation, after-hours detection, Exit Index
+npm test             # unit tests — screening, after-hours, Exit Index, moderation queue, admin auth
 npm run e2e          # browser test of the full post flow (needs a server running)
 npm run typecheck    # tsc --noEmit
 npm run lint
 ```
 
-`npm test` covers the three things that must not silently break: what moderation blocks, whether a
-6:47pm invite counts as after-hours (18:47 — an hour boundary of 19:00 would miss exactly the case
-the feature exists for), and that the Exit Index withholds a score below three stories and never
-punishes a company for volume alone.
+41 tests over the things that must not silently break: what screening blocks and what it merely
+flags; whether a 6:47pm invite counts as after-hours (18:47 — an hour boundary of 19:00 would miss
+exactly the case the feature exists for); that the Exit Index withholds a score below three stories
+and never punishes a company for volume alone; that one person reporting six times hides nothing
+while three people reporting once each does; and that a forged, expired, or salt-rotated moderator
+cookie is refused.
 
 ## Configuration
 
-Copy `.env.example` to `.env.local`. The setting that matters in production is `LINKEDOUT_SALT` — it
-is the salt for every anonymous hash and the HMAC key for entitlement cookies. Never set
-`LINKEDOUT_DEMO_UNLOCK` on a deployment that charges people.
+Copy `.env.example` to `.env.local`. Two settings matter in production:
+
+- `LINKEDOUT_SALT` — the salt for every anonymous hash and the HMAC key for entitlement and
+  moderator cookies. Set it to something long and random.
+- `LINKEDOUT_ADMIN_TOKEN` — enables `/admin`. Unset means no admin surface exists.
+
+Never set `LINKEDOUT_DEMO_UNLOCK` on a deployment that charges people.
 
 ## Note on the seed data
 

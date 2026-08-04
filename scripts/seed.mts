@@ -15,6 +15,7 @@ import {
   db,
   insertReceipts,
   insertStory,
+  migrateModeration,
   migrateReceipts,
   upsertCompany,
   type ReceiptKind,
@@ -900,10 +901,14 @@ function main() {
   const reset = process.argv.includes("--reset");
   const d = db();
   migrateReceipts();
+  migrateModeration();
 
   if (reset) {
-    d.exec(`DELETE FROM receipts; DELETE FROM echoes; DELETE FROM reports;
-            DELETE FROM stories; DELETE FROM companies; DELETE FROM subscribers;`);
+    // Order matters: every table holding a story_id has to go before stories does,
+    // or the foreign keys refuse the delete. Add new child tables to the front.
+    d.exec(`DELETE FROM moderation_log; DELETE FROM receipts; DELETE FROM echoes;
+            DELETE FROM reports; DELETE FROM stories; DELETE FROM companies;
+            DELETE FROM subscribers;`);
     console.log("Wiped existing data.");
   }
 

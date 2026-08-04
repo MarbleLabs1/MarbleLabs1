@@ -771,3 +771,187 @@ export function firstReceipts(storyIds: string[]): Record<string, Receipt> {
     rows.map((r) => [r.story_id, { ...r, after_hours: r.after_hours === 1 }]),
   );
 }
+
+/* ── Moderation queue ──────────────────────────────────────────────────────────
+ *
+ * Pre-publication screening buys you a lot, but it cannot judge. A story that reads
+ * as an allegation of unlawful conduct, or one that three readers have flagged, needs
+ * a person to decide. Without this the `status='review'` state is a black hole:
+ * stories go in and nothing ever comes out.
+ *
+ * Every decision is written to moderation_log. An unauditable moderation system is
+ * indistinguishable from censorship, and the log is what you show when someone asks
+ * why their story went.
+ */
+
+export type ModerationAction = "approve" | "remove" | "restore";
+
+export function migrateModeration(): void {
+  db().exec(`
+    CREATE TABLE IF NOT EXISTS moderation_log (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      story_id   TEXT NOT NULL REFERENCES stories(id),
+      action     TEXT NOT NULL,          -- approve | remove | restore
+      note       TEXT,
+      from_status TEXT NOT NULL,
+      to_status   TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_modlog_story ON moderation_log(story_id, created_at DESC);
+  `);
+}
+
+export type Report = {
+  id: number;
+  reason: string;
+  detail: string | null;
+  created_at: string;
+};
+
+export function getReports(storyId: string): Report[] {
+  return db()
+    .prepare(
+      `SELECT id, reason, detail, created_at FROM reports WHERE story_id = ? ORDER BY created_at DESC`,
+    )
+    .all(storyId) as Report[];
+}
+
+export type QueueItem = Story & {
+  findings: Finding[];
+  reports: Report[];
+  /** Distinct reporters, which is what actually triggers auto-hiding. */
+  reporter_count: number;
+  /** Why this is in front of a moderator: screening, reader reports, or both. */
+  cause: "screening" | "reports" | "both";
+};
+
+/** Screening findings, stored as JSON at insert time. */
+export type Finding = { action: string; code: string; message: string; excerpt?: string };
+
+function parseFindings(raw: string): Finding[] {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Everything awaiting a decision: stories held by screening, plus published stories
+ * that readers have flagged. Oldest first — a queue you work from the back of is a
+ * queue that never gets worked.
+ */
+export function listQueue(): QueueItem[] {
+  migrateModeration();
+  const rows = db()
+    .prepare(
+      `SELECT s.id, s.company_id, c.name AS company_name, c.slug AS company_slug,
+              s.headline, s.body, s.role_family, s.seniority, s.tenure_months,
+              s.reasons, s.severity, s.warn_friend, s.region, s.status, s.created_at,
+              s.findings AS raw_findings,
+              (SELECT COUNT(*) FROM echoes e WHERE e.story_id = s.id) AS echoes
+       FROM stories s JOIN companies c ON c.id = s.company_id
+       WHERE s.status = 'review'
+          OR (s.status = 'published' AND EXISTS (SELECT 1 FROM reports r WHERE r.story_id = s.id))
+       ORDER BY s.created_at ASC`,
+    )
+    .all() as (StoryRow & { raw_findings: string })[];
+
+  return rows.map((row) => {
+    const { raw_findings, ...rest } = row;
+    const story = hydrate(rest as StoryRow);
+    const reports = getReports(story.id);
+    const findings = parseFindings(raw_findings).filter((f) => f.action === "flag");
+    const reporterCount = (
+      db()
+        .prepare(`SELECT COUNT(DISTINCT reporter_hash) AS n FROM reports WHERE story_id = ?`)
+        .get(story.id) as { n: number }
+    ).n;
+    return {
+      ...story,
+      findings,
+      reports,
+      reporter_count: reporterCount,
+      cause: findings.length && reports.length ? "both" : reports.length ? "reports" : "screening",
+    };
+  });
+}
+
+export function queueSize(): number {
+  migrateModeration();
+  return (
+    db()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM stories s
+         WHERE s.status = 'review'
+            OR (s.status = 'published' AND EXISTS (SELECT 1 FROM reports r WHERE r.story_id = s.id))`,
+      )
+      .get() as { n: number }
+  ).n;
+}
+
+/**
+ * Applies a decision and records it.
+ *
+ * Approving also clears the reports, otherwise the story reappears in the queue
+ * forever and the same reports get re-litigated on every pass. Removal keeps them:
+ * they are the evidence for the decision.
+ */
+export function moderate(
+  storyId: string,
+  action: ModerationAction,
+  note?: string | null,
+): { ok: boolean; status?: string; error?: string } {
+  migrateModeration();
+  const d = db();
+  const row = d.prepare(`SELECT status FROM stories WHERE id = ?`).get(storyId) as
+    | { status: string }
+    | undefined;
+  if (!row) return { ok: false, error: "No such story." };
+
+  const to = action === "remove" ? "removed" : "published";
+  if (row.status === to && action !== "approve") {
+    return { ok: false, error: `Story is already ${to}.` };
+  }
+
+  const tx = d.transaction(() => {
+    d.prepare(`UPDATE stories SET status = ? WHERE id = ?`).run(to, storyId);
+    if (action === "approve" || action === "restore") {
+      d.prepare(`DELETE FROM reports WHERE story_id = ?`).run(storyId);
+    }
+    d.prepare(
+      `INSERT INTO moderation_log (story_id, action, note, from_status, to_status)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(storyId, action, note ?? null, row.status, to);
+  });
+  tx();
+
+  return { ok: true, status: to };
+}
+
+export type LogEntry = {
+  id: number;
+  story_id: string;
+  action: string;
+  note: string | null;
+  from_status: string;
+  to_status: string;
+  created_at: string;
+  headline: string;
+  company_name: string;
+};
+
+export function recentDecisions(limit = 20): LogEntry[] {
+  migrateModeration();
+  return db()
+    .prepare(
+      `SELECT l.id, l.story_id, l.action, l.note, l.from_status, l.to_status, l.created_at,
+              s.headline, c.name AS company_name
+       FROM moderation_log l
+       JOIN stories s ON s.id = l.story_id
+       JOIN companies c ON c.id = s.company_id
+       ORDER BY l.created_at DESC, l.id DESC LIMIT ?`,
+    )
+    .all(limit) as LogEntry[];
+}
