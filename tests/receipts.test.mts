@@ -36,3 +36,22 @@ test("labels with no time signal do not flag", () => {
     assert.equal(looksAfterHours(label), false, label);
   }
 });
+
+test("an invalid 12-hour clock value is not classified at all", () => {
+  for (const label of ["18:99 pm", "13:00 pm", "0:30 am", "99 pm"]) {
+    assert.equal(looksAfterHours(label), false, label);
+  }
+});
+
+test("an invalid 24-hour clock value is not classified at all", () => {
+  for (const label of ["25:00", "18:99", "23:61"]) {
+    assert.equal(looksAfterHours(label), false, label);
+  }
+});
+
+test("valid boundary clock values still classify correctly", () => {
+  assert.equal(looksAfterHours("12:00 pm"), false);
+  assert.equal(looksAfterHours("12:00 am"), true);
+  assert.equal(looksAfterHours("23:59"), true);
+  assert.equal(looksAfterHours("00:00"), true);
+});

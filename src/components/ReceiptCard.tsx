@@ -41,7 +41,7 @@ function Chat({ receipt }: { receipt: Receipt }) {
         >
           {receipt.sender_role.replace(/^(my|the|a)\s+/i, "").slice(0, 2).toUpperCase()}
         </div>
-        <div className="max-w-lg rounded-2xl rounded-tl-sm bg-ink-3 px-3.5 py-2.5 text-[15px] leading-relaxed">
+        <div className="max-w-lg whitespace-pre-line rounded-2xl rounded-tl-sm bg-ink-3 px-3.5 py-2.5 text-[15px] leading-relaxed">
           {receipt.content}
         </div>
       </div>

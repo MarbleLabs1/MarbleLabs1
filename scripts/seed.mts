@@ -903,15 +903,6 @@ function main() {
   migrateReceipts();
   migrateModeration();
 
-  if (reset) {
-    // Order matters: every table holding a story_id has to go before stories does,
-    // or the foreign keys refuse the delete. Add new child tables to the front.
-    d.exec(`DELETE FROM moderation_log; DELETE FROM receipts; DELETE FROM echoes;
-            DELETE FROM reports; DELETE FROM stories; DELETE FROM companies;
-            DELETE FROM subscribers;`);
-    console.log("Wiped existing data.");
-  }
-
   const setCreated = d.prepare(`UPDATE stories SET created_at = ? WHERE id = ?`);
   const addEchoRow = d.prepare(
     `INSERT OR IGNORE INTO echoes (story_id, voter_hash) VALUES (?, ?)`,
@@ -920,51 +911,67 @@ function main() {
   let inserted = 0;
   let receiptTotal = 0;
 
-  STORIES.forEach((s, i) => {
-    const company = upsertCompany({ name: s.company, industry: s.industry, size_bucket: s.size });
-    const id = `seed${String(i).padStart(3, "0")}${randomBytes(3).toString("hex")}`;
+  // One transaction for the reset and the ~30 stories plus their ~800 echo rows: without
+  // it, better-sqlite3 commits each statement separately (one WAL write per row), and a
+  // failure partway through leaves a half-seeded database that duplicates on the next
+  // run instead of a clean failure.
+  const seedAll = d.transaction(() => {
+    if (reset) {
+      // Order matters: every table holding a story_id has to go before stories does,
+      // or the foreign keys refuse the delete. Add new child tables to the front.
+      d.exec(`DELETE FROM moderation_log; DELETE FROM receipts; DELETE FROM echoes;
+              DELETE FROM reports; DELETE FROM stories; DELETE FROM companies;
+              DELETE FROM subscribers;`);
+      console.log("Wiped existing data.");
+    }
 
-    insertStory({
-      id,
-      company_id: company.id,
-      headline: s.headline,
-      body: s.body,
-      role_family: s.role,
-      seniority: s.seniority,
-      tenure_months: s.tenure,
-      reasons: s.reasons,
-      severity: s.severity,
-      warn_friend: s.warn,
-      region: s.region ?? null,
-      status: "published",
-      findings: [],
-      author_hash: anonHash(`seed-author-${i}`),
-    });
+    STORIES.forEach((s, i) => {
+      const company = upsertCompany({ name: s.company, industry: s.industry, size_bucket: s.size });
+      const id = `seed${String(i).padStart(3, "0")}${randomBytes(3).toString("hex")}`;
 
-    // Spread across the last few months so the timeline and "recent" sort look alive.
-    setCreated.run(daysAgo(2 + i * 4 + (i % 3)), id);
-
-    if (s.receipts?.length) {
-      insertReceipts(
+      insertStory({
         id,
-        s.receipts.map((r) => ({
-          kind: r.kind,
-          sender_role: r.sender,
-          sent_at_label: r.when ?? null,
-          subject: r.subject ?? null,
-          content: r.content,
-          after_hours: looksAfterHours(r.when ?? ""),
-        })),
-      );
-      receiptTotal += s.receipts.length;
-    }
+        company_id: company.id,
+        headline: s.headline,
+        body: s.body,
+        role_family: s.role,
+        seniority: s.seniority,
+        tenure_months: s.tenure,
+        reasons: s.reasons,
+        severity: s.severity,
+        warn_friend: s.warn,
+        region: s.region ?? null,
+        status: "published",
+        findings: [],
+        author_hash: anonHash(`seed-author-${i}`),
+      });
 
-    for (let e = 0; e < (s.echoes ?? 0); e++) {
-      addEchoRow.run(id, anonHash(`seed-echo-${i}-${e}`));
-    }
+      // Spread across the last few months so the timeline and "recent" sort look alive.
+      setCreated.run(daysAgo(2 + i * 4 + (i % 3)), id);
 
-    inserted++;
+      if (s.receipts?.length) {
+        insertReceipts(
+          id,
+          s.receipts.map((r) => ({
+            kind: r.kind,
+            sender_role: r.sender,
+            sent_at_label: r.when ?? null,
+            subject: r.subject ?? null,
+            content: r.content,
+            after_hours: looksAfterHours(r.when ?? ""),
+          })),
+        );
+        receiptTotal += s.receipts.length;
+      }
+
+      for (let e = 0; e < (s.echoes ?? 0); e++) {
+        addEchoRow.run(id, anonHash(`seed-echo-${i}-${e}`));
+      }
+
+      inserted++;
+    });
   });
+  seedAll();
 
   const companies = (d.prepare(`SELECT COUNT(*) AS n FROM companies`).get() as { n: number }).n;
   console.log(

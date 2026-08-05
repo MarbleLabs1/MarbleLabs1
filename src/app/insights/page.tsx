@@ -43,7 +43,9 @@ export default async function InsightsPage() {
     }))
     .sort((a, b) => b.avgIndex - a.avgIndex);
 
-  const totalReasonHits = stats.topReasons.reduce((a, r) => a + r.count, 0) || 1;
+  // Not a sum over topReasons: that list is truncated to 8 rows, so summing it would
+  // understate the total and inflate every displayed percentage.
+  const totalReasonHits = stats.totalReasonSelections || 1;
 
   return (
     <>
@@ -60,7 +62,7 @@ export default async function InsightsPage() {
         {[
           { k: "Stories", v: stats.stories.toLocaleString() },
           { k: "Companies", v: stats.companies.toLocaleString() },
-          { k: "Median tenure at exit", v: `${stats.avgTenureMonths} mo` },
+          { k: "Average tenure at exit", v: `${stats.avgTenureMonths} mo` },
           { k: "Would warn a friend", v: pct(stats.warnRate) },
         ].map((s) => (
           <div key={s.k} className="border-t border-line p-4 sm:border-t-0">

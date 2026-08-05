@@ -101,3 +101,34 @@ test("catches names regardless of how the role word is capitalised", () => {
     assert.ok(codes({ headline: "Summary line here", body }).includes("block:named_individual"), body.slice(0, 40));
   }
 });
+
+test("does not block ordinary short number sequences as a phone number", () => {
+  // PHONE is loose enough to match runs like "1, 2, 3, 4, 5" unless a digit-count floor
+  // is applied consistently with what redaction already uses.
+  for (const body of [
+    `I rated it 1, 2, 3, 4, 5 out of five on every question. ${LONG}`,
+    `It took me 4-5 months to notice the pattern properly. ${LONG}`,
+  ]) {
+    assert.equal(screen({ headline: "Summary line here", body }).ok, true, body.slice(0, 40));
+  }
+});
+
+test("a long-enough digit run across a date range is still treated as phone-like", () => {
+  // Same threshold, both directions: "2019 - 2021" has eight digits once you count
+  // them, which is exactly where a real short phone number starts too. This is a
+  // known, accepted false positive at the boundary, not a regression to guard against.
+  assert.ok(
+    codes({
+      headline: "Summary line here",
+      body: `I worked there from 2019 - 2021 before I left. ${LONG}`,
+    }).includes("block:phone"),
+  );
+});
+
+test("still blocks a real phone number", () => {
+  assert.ok(
+    codes({ headline: "Summary line here", body: `Call me on 07700 900123. ${LONG}` }).includes(
+      "block:phone",
+    ),
+  );
+});

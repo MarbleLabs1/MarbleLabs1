@@ -47,7 +47,7 @@ function Hero({ stats }: { stats: ReturnType<typeof globalStats> }) {
         {[
           { k: "Stories", v: stats.stories.toLocaleString() },
           { k: "Companies", v: stats.companies.toLocaleString() },
-          { k: "Median tenure", v: `${stats.avgTenureMonths} mo` },
+          { k: "Average tenure", v: `${stats.avgTenureMonths} mo` },
           { k: "Would warn a friend", v: pct(stats.warnRate) },
         ].map((s) => (
           <div key={s.k} className="border-t border-line p-4 sm:border-t-0">

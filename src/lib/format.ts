@@ -7,11 +7,11 @@ export function relativeTime(value: string): string {
   const then = parseSqliteDate(value).getTime();
   const seconds = Math.max(0, (Date.now() - then) / 1000);
   const units: [number, string][] = [
-    [60, "s"],
-    [3600, "m"],
-    [86400, "h"],
-    [2592000, "d"],
-    [31536000, "mo"],
+    [60, "m"],
+    [3600, "h"],
+    [86400, "d"],
+    [2592000, "mo"],
+    [31536000, "y"],
   ];
   if (seconds < 60) return "just now";
   for (let i = 1; i < units.length; i++) {

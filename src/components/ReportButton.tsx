@@ -20,10 +20,12 @@ export function ReportButton({ storyId }: { storyId: string }) {
   const [reason, setReason] = useState(OPTIONS[0].value);
   const [detail, setDetail] = useState("");
   const [result, setResult] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function send() {
     setBusy(true);
+    setFailed(null);
     try {
       const res = await fetch(`/api/stories/${storyId}/report`, {
         method: "POST",
@@ -31,10 +33,16 @@ export function ReportButton({ storyId }: { storyId: string }) {
         body: JSON.stringify({ reason, detail: detail || undefined }),
       });
       const data = await res.json();
-      setResult(data.message ?? (res.ok ? "Reported." : "Could not report that."));
+      if (!res.ok) {
+        // Failure keeps the form open and retryable — collapsing to a dead end here
+        // means a legitimate report is lost with no way to try again short of a reload.
+        setFailed(data.error ?? "Could not report that. Try again.");
+        return;
+      }
+      setResult(data.message ?? "Reported.");
       setOpen(false);
     } catch {
-      setResult("Could not reach the server.");
+      setFailed("Could not reach the server. Try again.");
     } finally {
       setBusy(false);
     }
@@ -81,6 +89,7 @@ export function ReportButton({ storyId }: { storyId: string }) {
         maxLength={1000}
         className="mt-3 min-h-20 w-full rounded-md border border-line bg-ink-2 px-3 py-2 text-sm placeholder:text-muted/70 focus:border-acid focus:outline-none"
       />
+      {failed && <p className="mt-3 text-sm text-alarm">{failed}</p>}
       <div className="mt-3 flex gap-3">
         <button
           type="button"

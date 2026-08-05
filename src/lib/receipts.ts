@@ -82,14 +82,22 @@ export function looksAfterHours(label: string): boolean {
   // 12-hour clock: 6:47 pm, 11 pm
   const twelve = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/);
   if (twelve) {
-    const hour = (Number(twelve[1]) % 12) + (twelve[3] === "pm" ? 12 : 0);
-    return outsideWorkingHours(hour, Number(twelve[2] ?? 0));
+    const rawHour = Number(twelve[1]);
+    const minute = Number(twelve[2] ?? 0);
+    // "18:99pm" and the like: an invalid clock value should not silently become a
+    // (wrong) after-hours badge that then gets persisted and counted in company metrics.
+    if (rawHour < 1 || rawHour > 12 || minute > 59) return false;
+    const hour = (rawHour % 12) + (twelve[3] === "pm" ? 12 : 0);
+    return outsideWorkingHours(hour, minute);
   }
 
   // 24-hour clock: 18:30, 23:14
   const twentyFour = text.match(/\b(\d{1,2}):(\d{2})\b/);
   if (twentyFour) {
-    return outsideWorkingHours(Number(twentyFour[1]), Number(twentyFour[2]));
+    const hour = Number(twentyFour[1]);
+    const minute = Number(twentyFour[2]);
+    if (hour > 23 || minute > 59) return false;
+    return outsideWorkingHours(hour, minute);
   }
 
   return false;

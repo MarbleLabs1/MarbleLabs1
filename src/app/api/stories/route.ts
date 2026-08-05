@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
+  db,
   insertReceipts,
   insertStory,
   listStories,
@@ -36,7 +37,15 @@ const CreateStory = z.object({
   roleFamily: z.enum(ROLE_FAMILIES),
   seniority: z.enum(SENIORITIES),
   tenureMonths: z.coerce.number().int().min(0).max(600),
-  reasons: z.array(z.enum(REASON_CODES as [string, ...string[]])).min(1).max(6),
+  // Deduplicated after the length check: three copies of the same reason should not
+  // count as three data points in reasonCounts()/topReasons(), which tally one JSON
+  // array entry per row. A duplicate submission is still a valid 1-6 length submission
+  // pre-dedup, so the min/max bounds apply to what the poster picked, not the stored set.
+  reasons: z
+    .array(z.enum(REASON_CODES as [string, ...string[]]))
+    .min(1)
+    .max(6)
+    .transform((codes) => [...new Set(codes)]),
   severity: z.coerce.number().int().min(1).max(5),
   warnFriend: z.boolean(),
   region: z.string().trim().max(60).optional(),
@@ -111,51 +120,58 @@ export async function POST(req: Request) {
     return json({ error: "This post needs changes before it can go up.", findings: allFindings }, 422);
   }
 
-  const company = upsertCompany({
-    name: input.company,
-    industry: input.industry ?? null,
-    size_bucket: input.sizeBucket ?? null,
-  });
-
   const id = nanoid(12);
   const flagged = allFindings.some((f) => f.action === "flag");
 
-  insertStory({
-    id,
-    company_id: company.id,
-    headline: input.headline,
-    body: verdict.redacted,
-    role_family: input.roleFamily,
-    seniority: input.seniority,
-    tenure_months: input.tenureMonths,
-    reasons: input.reasons,
-    severity: input.severity,
-    warn_friend: input.warnFriend,
-    region: input.region ?? null,
-    status: flagged ? "review" : "published",
-    findings: allFindings,
-    author_hash: authorHash,
-  });
+  // One transaction: a receipt-insert failure after the story is already written would
+  // otherwise leave a published story missing the receipts it was submitted with, with
+  // no error surfaced to the poster to explain why.
+  const companySlug = db().transaction(() => {
+    const company = upsertCompany({
+      name: input.company,
+      industry: input.industry ?? null,
+      size_bucket: input.sizeBucket ?? null,
+    });
 
-  if (input.receipts?.length) {
-    insertReceipts(
+    insertStory({
       id,
-      input.receipts.map((r) => ({
-        kind: r.kind,
-        sender_role: r.senderRole,
-        sent_at_label: r.sentAtLabel ?? null,
-        subject: r.subject ?? null,
-        content: r.content,
-        after_hours: r.afterHours ?? looksAfterHours(r.sentAtLabel ?? ""),
-      })),
-    );
-  }
+      company_id: company.id,
+      headline: input.headline,
+      body: verdict.redacted,
+      role_family: input.roleFamily,
+      seniority: input.seniority,
+      tenure_months: input.tenureMonths,
+      reasons: input.reasons,
+      severity: input.severity,
+      warn_friend: input.warnFriend,
+      region: input.region ?? null,
+      status: flagged ? "review" : "published",
+      findings: allFindings,
+      author_hash: authorHash,
+    });
+
+    if (input.receipts?.length) {
+      insertReceipts(
+        id,
+        input.receipts.map((r) => ({
+          kind: r.kind,
+          sender_role: r.senderRole,
+          sent_at_label: r.sentAtLabel ?? null,
+          subject: r.subject ?? null,
+          content: r.content,
+          after_hours: r.afterHours ?? looksAfterHours(r.sentAtLabel ?? ""),
+        })),
+      );
+    }
+
+    return company.slug;
+  })();
 
   return json(
     {
       id,
       status: flagged ? "review" : "published",
-      companySlug: company.slug,
+      companySlug,
       findings: allFindings,
     },
     201,

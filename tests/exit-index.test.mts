@@ -75,3 +75,17 @@ test("slugify produces stable, URL-safe company keys", () => {
   // Same company typed two ways must collide onto one page rather than fragmenting.
   assert.equal(slugify("Halcyon Financial Services"), slugify("halcyon financial services"));
 });
+
+test("slugify never collides two different names onto an empty slug", () => {
+  // Names with no ASCII alphanumerics after normalisation used to both reduce to "",
+  // which meant the second such company's stories silently merged into the first's.
+  const a = slugify("💼💼💼");
+  const b = slugify("🚀🚀🚀");
+  assert.notEqual(a, "");
+  assert.notEqual(b, "");
+  assert.notEqual(a, b);
+});
+
+test("slugify is stable for the same unusual name", () => {
+  assert.equal(slugify("💼💼💼"), slugify("💼💼💼"));
+});

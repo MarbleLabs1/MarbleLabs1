@@ -25,12 +25,24 @@ export function EchoButton({ storyId, initial }: { storyId: string; initial: num
     }
   }
 
+  const label =
+    state === "done"
+      ? `This happened to me too — recorded. ${count} in total.`
+      : state === "error"
+        ? "Could not record that you had the same experience. Try again."
+        : `This happened to me too. ${count} so far.`;
+
   return (
     <button
       type="button"
+      data-testid="echo-button"
       onClick={echo}
       disabled={state === "sending" || state === "done"}
-      aria-label="This happened to me too"
+      aria-label={label}
+      // Announces the recorded count or the error to screen reader users, who otherwise
+      // get no confirmation that the click did anything — the visible text changes but
+      // a static aria-label would keep announcing the pre-click state forever.
+      aria-live="polite"
       className={`group flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-xs transition-colors ${
         state === "done"
           ? "border-acid text-acid"

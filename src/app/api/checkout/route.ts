@@ -7,7 +7,9 @@ export const dynamic = "force-dynamic";
 
 const Checkout = z.object({
   plan: z.enum(["candidate", "employer"]),
-  email: z.string().trim().email().max(200),
+  // Not z.email().trim() — in this chain order trim runs after the format check, so it
+  // rejects an address with surrounding whitespace instead of cleaning it up first.
+  email: z.string().trim().max(200).pipe(z.email()),
 });
 
 /**

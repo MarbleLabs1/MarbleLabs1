@@ -109,7 +109,9 @@ export function SubmitForm() {
           severity,
           warnFriend,
           region: region || undefined,
-          attest: true,
+          // The real `attest` state, not a literal — canSubmit already gates on it, but
+          // asserting attestation the poster never gave would defeat the point of asking.
+          attest,
           receipts: receipts
             .filter((r) => r.content.trim().length > 1)
             .map((r) => ({

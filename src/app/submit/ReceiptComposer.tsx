@@ -5,6 +5,8 @@ import type { ReceiptKind } from "@/lib/db";
 import { ReceiptCard } from "@/components/ReceiptCard";
 
 export type DraftReceipt = {
+  /** Stable identity for React's list reconciliation — see the comment at the map below. */
+  id: string;
   kind: ReceiptKind;
   senderRole: string;
   sentAtLabel: string;
@@ -14,7 +16,15 @@ export type DraftReceipt = {
 };
 
 export function emptyReceipt(kind: ReceiptKind = "chat"): DraftReceipt {
-  return { kind, senderRole: SENDER_ROLES[0], sentAtLabel: "", subject: "", content: "", afterHours: null };
+  return {
+    id: crypto.randomUUID(),
+    kind,
+    senderRole: SENDER_ROLES[0],
+    sentAtLabel: "",
+    subject: "",
+    content: "",
+    afterHours: null,
+  };
 }
 
 const fieldClass =
@@ -63,7 +73,10 @@ export function ReceiptComposer({
         const spec = RECEIPT_KINDS.find((k) => k.kind === r.kind)!;
         const guessed = r.afterHours ?? looksAfterHours(r.sentAtLabel);
         return (
-          <div key={i} className="rounded-md border border-line p-4">
+          // Keyed by id, not index: removing a middle row (below) would otherwise shift
+          // every later row's index, and React would reuse their DOM nodes for a
+          // different receipt — moving focus, selection and scroll to the wrong row.
+          <div key={r.id} className="rounded-md border border-line p-4">
             <div className="flex items-center justify-between gap-3">
               <select
                 value={r.kind}

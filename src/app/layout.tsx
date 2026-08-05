@@ -33,7 +33,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span>Linked</span>
               <span className="bg-acid px-1 text-ink">Out</span>
             </Link>
-            <nav className="hidden gap-5 text-sm text-muted sm:flex">
+            {/*
+              min-w-0 lets this shrink inside the flex row instead of forcing the header
+              wider than the viewport; overflow-x-auto keeps every link reachable by
+              scrolling instead of hiding Exit Index and Insights below sm with no other
+              way to reach them (the footer does not link either one).
+            */}
+            <nav
+              aria-label="Primary"
+              className="flex min-w-0 gap-5 overflow-x-auto whitespace-nowrap text-sm text-muted"
+            >
               {NAV.map((n) => (
                 <Link key={n.href} href={n.href} className="transition-colors hover:text-paper">
                   {n.label}

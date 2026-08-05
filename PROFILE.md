@@ -20,66 +20,66 @@ I'm a passionate developer focused on creating innovative solutions at the inter
 ### 🎯 Core Competencies
 
 - **Blockchain Development**: Smart contracts, DeFi protocols, consensus mechanisms
-- - **AI/ML Engineering**: Neural networks, data analysis, algorithmic optimization
-  - - **Backend Systems**: Python, TypeScript, distributed architecture design
-    - - **DevOps & Infrastructure**: Docker, Linux systems, cloud deployment
-     
-      - ---
+- **AI/ML Engineering**: Neural networks, data analysis, algorithmic optimization
+- **Backend Systems**: Python, TypeScript, distributed architecture design
+- **DevOps & Infrastructure**: Docker, Linux systems, cloud deployment
 
-      ## 🚀 Featured Projects
+---
 
-      | Project | Description | Tech Stack |
-      |---------|-------------|------------|
-      | **macos-theme-for-linux** | Professional macOS-inspired Linux desktop environment | Shell, Linux customization |
-      | **code-wizard-ollama-ai** | AI-powered code assistant leveraging local LLMs | TypeScript, Ollama, AI |
-      | **IOS-emulator** | Cross-platform iOS app testing without Xcode costs | Shell, QEMU |
-      | **Marble_Blockchain** | Blockchain infrastructure and protocol research | Python, Cryptography |
-      | **C0lornote** | Privacy-focused note-taking application | Python, Desktop App |
-      | **DJset-python** | Audio processing and DJ toolkit | Python, DSP |
+## 🚀 Featured Projects
 
-      ---
+| Project | Description | Tech Stack |
+|---------|-------------|------------|
+| **macos-theme-for-linux** | Professional macOS-inspired Linux desktop environment | Shell, Linux customization |
+| **code-wizard-ollama-ai** | AI-powered code assistant leveraging local LLMs | TypeScript, Ollama, AI |
+| **IOS-emulator** | Cross-platform iOS app testing without Xcode costs | Shell, QEMU |
+| **Marble_Blockchain** | Blockchain infrastructure and protocol research | Python, Cryptography |
+| **C0lornote** | Privacy-focused note-taking application | Python, Desktop App |
+| **DJset-python** | Audio processing and DJ toolkit | Python, DSP |
 
-      ## 📊 Tech Stack
+---
 
-      ```
-      Languages:  Python • TypeScript • Shell • Bash
-      Blockchain: Ethereum • Smart Contracts • Web3.py • Solidity
-      AI/ML:      TensorFlow • PyTorch • Ollama • LLMs
-      Tools:      Git • Docker • Linux • VS Code • GitHub
-      Frameworks: Node.js • FastAPI • Flask
-      ```
+## 📊 Tech Stack
 
-      ---
+```
+Languages:  Python • TypeScript • Shell • Bash
+Blockchain: Ethereum • Smart Contracts • Web3.py • Solidity
+AI/ML:      TensorFlow • PyTorch • Ollama • LLMs
+Tools:      Git • Docker • Linux • VS Code • GitHub
+Frameworks: Node.js • FastAPI • Flask
+```
 
-      ## 🌱 Currently
+---
 
-      - 🔍 Researching advanced blockchain consensus mechanisms
-      - - 🤖 Building AI-powered developer tools
-        - - 📚 Contributing to open-source blockchain projects
-          - - 🌍 Exploring decentralized infrastructure solutions
-           
-            - ---
+## 🌱 Currently
 
-            ## 💼 Let's Collaborate
+- 🔍 Researching advanced blockchain consensus mechanisms
+- 🤖 Building AI-powered developer tools
+- 📚 Contributing to open-source blockchain projects
+- 🌍 Exploring decentralized infrastructure solutions
 
-            - 🌐 **Portfolio**: https://marbleceo.homelinux.com/
-            - - 📧 **Interests**: Blockchain development, AI integration, open-source contributions
-              - - 🤝 **Open to**: Partnerships, collaborations, and interesting projects
-               
-                - ---
+---
 
-                ## 📈 Stats
+## 💼 Let's Collaborate
 
-                ![GitHub Stats](https://img.shields.io/badge/Repositories-30+-blue?style=flat-square)
-                ![GitHub Stars](https://img.shields.io/badge/Stars-13+-yellow?style=flat-square)
-                ![Focus](https://img.shields.io/badge/Focus-Web3%20%26%20AI-green?style=flat-square)
+- 🌐 **Portfolio**: https://marbleceo.homelinux.com/
+- 📧 **Interests**: Blockchain development, AI integration, open-source contributions
+- 🤝 **Open to**: Partnerships, collaborations, and interesting projects
 
-                ---
+---
 
-                <div align="center">
+## 📈 Stats
 
-                **Let's build the future together! 🚀**
+![GitHub Stats](https://img.shields.io/badge/Repositories-30+-blue?style=flat-square)
+![GitHub Stars](https://img.shields.io/badge/Stars-13+-yellow?style=flat-square)
+![Focus](https://img.shields.io/badge/Focus-Web3%20%26%20AI-green?style=flat-square)
 
-                *Crafting innovative solutions one commit at a time*
+---
 
-                </div>
+<div align="center">
+
+**Let's build the future together! 🚀**
+
+*Crafting innovative solutions one commit at a time*
+
+</div>

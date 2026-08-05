@@ -85,13 +85,23 @@ function excerpt(text: string, match: string): string {
   return `${start > 0 ? "…" : ""}${text.slice(start, end).trim()}${end < text.length ? "…" : ""}`;
 }
 
+/**
+ * The PHONE regex is loose on purpose (it has to catch "+44 7700 900123" and "(020) 7946
+ * 0958" alike), which means it also matches ordinary text like "1, 2, 3, 4, 5" or "2019 -
+ * 2021 (two years)". A real phone number has at least eight digits in it; apply that test
+ * everywhere PHONE is used, or screening blocks stories that redaction would leave alone.
+ */
+function isPhoneLike(match: string): boolean {
+  return match.replace(/\D/g, "").length >= 8;
+}
+
 /** Strips contact details and replaces them with a visible marker. */
 export function redactContactDetails(text: string): string {
   return text
     .replace(EMAIL, "[email removed]")
     .replace(URL, "[link removed]")
     .replace(HANDLE, "[handle removed]")
-    .replace(PHONE, (m) => (m.replace(/\D/g, "").length >= 8 ? "[number removed]" : m));
+    .replace(PHONE, (m) => (isPhoneLike(m) ? "[number removed]" : m));
 }
 
 export function screen(input: { headline: string; body: string }): ScreenResult {
@@ -131,8 +141,9 @@ export function screen(input: { headline: string; body: string }): ScreenResult 
     ["link", URL, "Remove the link. Links get used to identify posters."],
     ["handle", HANDLE, "Remove the @handle."],
   ] as const) {
-    const hit = combined.match(re);
-    if (hit) {
+    const all = combined.match(re);
+    const hit = code === "phone" ? (all?.filter(isPhoneLike) ?? null) : all;
+    if (hit && hit.length) {
       findings.push({ action: "block", code, message, excerpt: excerpt(combined, hit[0]) });
     }
   }

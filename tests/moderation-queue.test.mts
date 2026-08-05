@@ -9,6 +9,7 @@ process.env.LINKEDOUT_DB = join(mkdtempSync(join(tmpdir(), "lo-mod-")), "test.db
 process.env.LINKEDOUT_SALT = "test-salt";
 
 const D = await import("../src/lib/db.ts");
+const { REASON_MAP: REASON_MAP2 } = await import("../src/lib/taxonomy.ts");
 
 function makeStory(id: string, status: string, findings: unknown = []) {
   const company = D.upsertCompany({ name: "Queue Test Co" });
@@ -134,4 +135,66 @@ test("every decision is recorded, in order, newest first", () => {
   assert.ok(log.length >= 2);
   const ids = log.map((l) => l.story_id);
   assert.ok(ids.indexOf("remove1") < ids.indexOf("approve1"), "log should be newest first");
+});
+
+test("moderate() refuses a removal with no reason, even bypassing the API route", () => {
+  makeStory("noreason1", "review");
+  const empty = D.moderate("noreason1", "remove");
+  assert.equal(empty.ok, false);
+  assert.match(empty.error ?? "", /Removals need a reason/);
+  assert.equal(D.getStory("noreason1")?.status, "review", "must not be removed without a reason");
+
+  const blank = D.moderate("noreason1", "remove", "   ");
+  assert.equal(blank.ok, false, "whitespace-only is not a reason");
+});
+
+test("moderate() accepts approve and restore with no note", () => {
+  makeStory("noreason2", "review");
+  assert.equal(D.moderate("noreason2", "approve").ok, true);
+});
+
+test("listCompanyStats ranks by exit_index even when SQL's simpler order would have cut a company first", () => {
+  // Company A: one severe story (severity 5) plus two mild ones -> lower avg severity,
+  // but its reasons are all maximally weighted, which should still win on exit_index.
+  // Company B: three stories at moderate severity but "better_offer" reasons -> higher
+  // avg severity and story count (what the old SQL ORDER BY ranked on) yet a near-zero
+  // exit_index. A LIMIT applied before the JS sort could keep B and cut A.
+  const a = D.upsertCompany({ name: "Ranking Test A" });
+  const b = D.upsertCompany({ name: "Ranking Test B" });
+
+  const mk = (id: string, companyId: number, severity: number, reasons: string[], warn: boolean) =>
+    D.insertStory({
+      id,
+      company_id: companyId,
+      headline: `Story ${id}`,
+      body: "A long enough plain description of what happened at this job, written out.",
+      role_family: "Engineering",
+      seniority: "Mid",
+      tenure_months: 6,
+      reasons,
+      severity,
+      warn_friend: warn,
+      region: null,
+      status: "published",
+      findings: [],
+      author_hash: D.anonHash(`rank-${id}`),
+    });
+
+  mk("rankA1", a.id, 5, ["discrimination"], true);
+  mk("rankA2", a.id, 2, ["discrimination"], true);
+  mk("rankA3", a.id, 2, ["discrimination"], true);
+
+  mk("rankB1", b.id, 3, ["better_offer"], false);
+  mk("rankB2", b.id, 3, ["better_offer"], false);
+  mk("rankB3", b.id, 3, ["better_offer"], false);
+  mk("rankB4", b.id, 3, ["better_offer"], false);
+
+  const weightFor = (code: string) => REASON_MAP2[code]?.weight ?? 0.5;
+
+  // With limit 1, the old SQL-side LIMIT (ORDER BY avg severity, story count) would
+  // have kept B — more stories, equal-or-higher raw severity — and cut A before the
+  // JS exit_index sort ever saw it.
+  const top = D.listCompanyStats(weightFor, { limit: 1, minStories: 3 });
+  assert.equal(top.length, 1);
+  assert.equal(top[0].slug, a.slug, "the company with the higher exit_index must win, not the one SQL's ORDER BY favoured");
 });

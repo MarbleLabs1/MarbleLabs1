@@ -81,6 +81,30 @@ function migrate(d: Database.Database) {
       plan       TEXT NOT NULL,           -- candidate | employer
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS receipts (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      story_id      TEXT NOT NULL REFERENCES stories(id),
+      kind          TEXT NOT NULL,
+      sender_role   TEXT NOT NULL,
+      sent_at_label TEXT,
+      subject       TEXT,
+      content       TEXT NOT NULL,
+      after_hours   INTEGER NOT NULL DEFAULT 0,
+      position      INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_receipts_story ON receipts(story_id, position);
+
+    CREATE TABLE IF NOT EXISTS moderation_log (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      story_id   TEXT NOT NULL REFERENCES stories(id),
+      action     TEXT NOT NULL,          -- approve | remove | restore
+      note       TEXT,
+      from_status TEXT NOT NULL,
+      to_status   TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_modlog_story ON moderation_log(story_id, created_at DESC);
   `);
 }
 
@@ -95,13 +119,18 @@ export function anonHash(value: string): string {
 }
 
 export function slugify(name: string): string {
-  return name
+  const slug = name
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 60);
+  if (slug) return slug;
+  // A name with no ASCII alphanumerics (e.g. all emoji, or a non-Latin script NFKD
+  // doesn't decompose) reduces to "". Without a fallback, every such company collides
+  // on slug "" and their stories, receipts and Exit Index merge into one record.
+  return `company-${createHash("sha256").update(name).digest("hex").slice(0, 12)}`;
 }
 
 export type CompanyRow = {
@@ -399,8 +428,37 @@ function reasonCounts(slug: string): { code: string; count: number }[] {
     .all(slug) as { code: string; count: number }[];
 }
 
-function buildStats(row: AggRow, weightFor: (code: string) => number): CompanyStats {
-  const top = reasonCounts(row.slug);
+/**
+ * Same shape as reasonCounts(), for every slug in one query. listCompanyStats() ranks a
+ * whole leaderboard at once, and reasonCounts() per row there would be an N+1 query per
+ * page load; this bucket-in-memory version replaces that with one query regardless of N.
+ */
+function reasonCountsForSlugs(slugs: string[]): Map<string, { code: string; count: number }[]> {
+  const buckets = new Map<string, { code: string; count: number }[]>();
+  if (slugs.length === 0) return buckets;
+  const placeholders = slugs.map(() => "?").join(",");
+  const rows = db()
+    .prepare(
+      `SELECT c.slug AS slug, j.value AS code, COUNT(*) AS count
+       FROM stories s JOIN companies c ON c.id = s.company_id, json_each(s.reasons) j
+       WHERE c.slug IN (${placeholders}) AND s.status = 'published'
+       GROUP BY c.slug, j.value ORDER BY c.slug, count DESC, code ASC`,
+    )
+    .all(...slugs) as { slug: string; code: string; count: number }[];
+  for (const r of rows) {
+    const bucket = buckets.get(r.slug) ?? [];
+    bucket.push({ code: r.code, count: r.count });
+    buckets.set(r.slug, bucket);
+  }
+  return buckets;
+}
+
+function buildStats(
+  row: AggRow,
+  weightFor: (code: string) => number,
+  reasons?: { code: string; count: number }[],
+): CompanyStats {
+  const top = reasons ?? reasonCounts(row.slug);
   // Weight each *selected reason instance*, so a company whose exits are mostly
   // "better offer" scores near zero even with a high story count.
   const weights: number[] = [];
@@ -447,21 +505,28 @@ export function listCompanyStats(
   opts: { limit?: number; minStories?: number; industry?: string } = {},
 ): CompanyStats[] {
   const min = opts.minStories ?? MIN_STORIES_FOR_INDEX;
-  const params: Record<string, unknown> = { min, limit: opts.limit ?? 50 };
+  const limit = opts.limit ?? 50;
+  const params: Record<string, unknown> = { min };
   let filter = "";
   if (opts.industry) {
     filter = `WHERE c.industry = @industry`;
     params.industry = opts.industry;
   }
+  // No SQL LIMIT here: exit_index blends reason weight, severity and warn rate, so the
+  // company that ranks #1 on it is not necessarily the one SQL's simpler ORDER BY would
+  // keep. Rank every qualifying company in JS, then slice — the correct order, not a
+  // guess at which rows the true order might have kept.
   const rows = db()
     .prepare(
       `${AGG_SELECT} ${filter} GROUP BY c.id HAVING COUNT(s.id) >= @min
-       ORDER BY AVG(s.severity) DESC, COUNT(s.id) DESC LIMIT @limit`,
+       ORDER BY AVG(s.severity) DESC, COUNT(s.id) DESC`,
     )
     .all(params) as AggRow[];
+  const reasonsBySlug = reasonCountsForSlugs(rows.map((r) => r.slug));
   return rows
-    .map((r) => buildStats(r, weightFor))
-    .sort((a, b) => (b.exit_index ?? 0) - (a.exit_index ?? 0));
+    .map((r) => buildStats(r, weightFor, reasonsBySlug.get(r.slug) ?? []))
+    .sort((a, b) => (b.exit_index ?? 0) - (a.exit_index ?? 0))
+    .slice(0, limit);
 }
 
 /** Platform-wide numbers for the landing page and the free half of the reports. */
@@ -469,6 +534,9 @@ export function globalStats(): {
   stories: number;
   companies: number;
   topReasons: { code: string; count: number }[];
+  /** Every reason selection across every story — the correct denominator for a share
+   *  of topReasons, which is truncated to 8 rows and undercounts if used as the total. */
+  totalReasonSelections: number;
   avgTenureMonths: number;
   warnRate: number;
 } {
@@ -494,10 +562,18 @@ export function globalStats(): {
        GROUP BY j.value ORDER BY count DESC LIMIT 8`,
     )
     .all() as { code: string; count: number }[];
+  const totalReasonSelections = (
+    d
+      .prepare(
+        `SELECT COUNT(*) AS n FROM stories s, json_each(s.reasons) j WHERE s.status = 'published'`,
+      )
+      .get() as { n: number }
+  ).n;
   return {
     stories: base.stories,
     companies,
     topReasons,
+    totalReasonSelections,
     avgTenureMonths: Math.round(base.tenure ?? 0),
     warnRate: Number((base.warn ?? 0).toFixed(3)),
   };
@@ -591,21 +667,14 @@ export type ReceiptRow = {
 
 export type Receipt = Omit<ReceiptRow, "after_hours"> & { after_hours: boolean };
 
+/**
+ * The receipts table now ships in migrate(), which runs once when the connection opens.
+ * Kept as a callable no-op — rather than deleted — because tests and scripts/seed.mts
+ * call it directly to guarantee the schema exists before they touch the tables from a
+ * fresh `db()` call, without needing to know that guarantee moved.
+ */
 export function migrateReceipts(): void {
-  db().exec(`
-    CREATE TABLE IF NOT EXISTS receipts (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      story_id      TEXT NOT NULL REFERENCES stories(id),
-      kind          TEXT NOT NULL,
-      sender_role   TEXT NOT NULL,
-      sent_at_label TEXT,
-      subject       TEXT,
-      content       TEXT NOT NULL,
-      after_hours   INTEGER NOT NULL DEFAULT 0,
-      position      INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE INDEX IF NOT EXISTS idx_receipts_story ON receipts(story_id, position);
-  `);
+  db();
 }
 
 export function insertReceipts(
@@ -786,19 +855,9 @@ export function firstReceipts(storyIds: string[]): Record<string, Receipt> {
 
 export type ModerationAction = "approve" | "remove" | "restore";
 
+/** See migrateReceipts() above — the DDL lives in migrate() now, this stays a no-op shim. */
 export function migrateModeration(): void {
-  db().exec(`
-    CREATE TABLE IF NOT EXISTS moderation_log (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      story_id   TEXT NOT NULL REFERENCES stories(id),
-      action     TEXT NOT NULL,          -- approve | remove | restore
-      note       TEXT,
-      from_status TEXT NOT NULL,
-      to_status   TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_modlog_story ON moderation_log(story_id, created_at DESC);
-  `);
+  db();
 }
 
 export type Report = {
@@ -858,21 +917,43 @@ export function listQueue(): QueueItem[] {
     )
     .all() as (StoryRow & { raw_findings: string })[];
 
+  // Two queries for the whole queue rather than two per row: the queue only holds
+  // content actively awaiting a decision, so it stays small, but "small" is exactly
+  // the assumption an N+1 pattern quietly relies on until the backlog isn't.
+  const ids = rows.map((r) => r.id);
+  const reportsById = new Map<string, Report[]>();
+  const reporterCountById = new Map<string, number>();
+  if (ids.length > 0) {
+    const placeholders = ids.map(() => "?").join(",");
+    const allReports = db()
+      .prepare(
+        `SELECT story_id, id, reason, detail, created_at FROM reports
+         WHERE story_id IN (${placeholders}) ORDER BY story_id, created_at DESC`,
+      )
+      .all(...ids) as (Report & { story_id: string })[];
+    for (const r of allReports) {
+      const { story_id, ...rest } = r;
+      reportsById.set(story_id, [...(reportsById.get(story_id) ?? []), rest]);
+    }
+    const counts = db()
+      .prepare(
+        `SELECT story_id, COUNT(DISTINCT reporter_hash) AS n FROM reports
+         WHERE story_id IN (${placeholders}) GROUP BY story_id`,
+      )
+      .all(...ids) as { story_id: string; n: number }[];
+    for (const c of counts) reporterCountById.set(c.story_id, c.n);
+  }
+
   return rows.map((row) => {
     const { raw_findings, ...rest } = row;
     const story = hydrate(rest as StoryRow);
-    const reports = getReports(story.id);
+    const reports = reportsById.get(story.id) ?? [];
     const findings = parseFindings(raw_findings).filter((f) => f.action === "flag");
-    const reporterCount = (
-      db()
-        .prepare(`SELECT COUNT(DISTINCT reporter_hash) AS n FROM reports WHERE story_id = ?`)
-        .get(story.id) as { n: number }
-    ).n;
     return {
       ...story,
       findings,
       reports,
-      reporter_count: reporterCount,
+      reporter_count: reporterCountById.get(story.id) ?? 0,
       cause: findings.length && reports.length ? "both" : reports.length ? "reports" : "screening",
     };
   });
@@ -903,6 +984,13 @@ export function moderate(
   action: ModerationAction,
   note?: string | null,
 ): { ok: boolean; status?: string; error?: string } {
+  // Enforced here, not only at the API route: moderate() is the one place every caller
+  // (route, script, future admin tooling) goes through, and an unauditable removal is
+  // indistinguishable from the censorship this log exists to rule out.
+  if (action === "remove" && !note?.trim()) {
+    return { ok: false, error: "Removals need a reason — it goes in the audit log." };
+  }
+
   migrateModeration();
   const d = db();
   const row = d.prepare(`SELECT status FROM stories WHERE id = ?`).get(storyId) as
