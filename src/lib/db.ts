@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { pseudonymFor } from "./identity.ts";
+import { resolveSecret } from "./secret.ts";
 
 /**
  * SQLite via better-sqlite3. Single file, synchronous, no service to run — the right
@@ -10,7 +11,8 @@ import { pseudonymFor } from "./identity.ts";
  *
  * When you outgrow it (roughly: multiple app instances, or you deploy anywhere with an
  * ephemeral filesystem such as Vercel/Lambda), the migration is Postgres. Every query
- * lives in this file and nowhere else precisely so that swap stays a one-file job.
+ * lives in this file and nowhere else precisely so that swap touches one file instead of
+ * every route and component that currently talks to SQLite directly.
  */
 
 const DB_PATH = process.env.LINKEDOUT_DB ?? "./data/linkedout.db";
@@ -147,7 +149,7 @@ function migrate(d: Database.Database) {
  * key (billing.ts, admin-token.ts) means a leak of one does not also forge the other.
  */
 export function anonHash(value: string): string {
-  const key = process.env.LINKEDOUT_HASH_KEY ?? process.env.LINKEDOUT_SALT ?? "dev-salt-change-me";
+  const key = resolveSecret(process.env.LINKEDOUT_HASH_KEY, process.env.LINKEDOUT_SALT);
   return createHash("sha256").update(`${key}:${value}`).digest("hex").slice(0, 32);
 }
 
@@ -1098,9 +1100,9 @@ export function recentDecisions(limit = 20): LogEntry[] {
  *
  * A comment is a much smaller commitment than a full story, which is exactly why it
  * carries the same doxxing risk on a smaller budget of words: "my manager Karen still
- * works there" fits in a sentence. Comments go through the same screen() used for
- * stories — the length floor is bypassed the same way receipts bypass it (pad, screen,
- * drop the too_short finding), not by relaxing what gets blocked.
+ * works there" fits in a sentence. Comments go through screenShort() — the same
+ * name/contact/allegation checks a full story gets, minus the length and headline
+ * rules that make no sense for a comment — not a relaxed version of what gets blocked.
  */
 
 export type Comment = {

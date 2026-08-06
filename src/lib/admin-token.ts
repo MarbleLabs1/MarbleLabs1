@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { resolveSecret } from "./secret.ts";
 
 /**
  * Moderator token and session crypto. Deliberately free of any Next.js import so it can
@@ -28,7 +29,7 @@ export function adminEnabled(): boolean {
 /** LINKEDOUT_COOKIE_SECRET is preferred; LINKEDOUT_SALT is the fallback — see anonHash()
  *  in db.ts for why keeping this separate from the hashing key matters. */
 function signingKey(): string {
-  return process.env.LINKEDOUT_COOKIE_SECRET ?? process.env.LINKEDOUT_SALT ?? "dev-salt-change-me";
+  return resolveSecret(process.env.LINKEDOUT_COOKIE_SECRET, process.env.LINKEDOUT_SALT);
 }
 
 /** Constant-time compare, so a wrong token cannot be discovered one character at a time. */

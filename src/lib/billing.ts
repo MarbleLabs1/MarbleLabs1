@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { resolveSecret } from "./secret.ts";
 
 /**
  * Money.
@@ -101,7 +102,7 @@ export const ENTITLEMENT_COOKIE = "lo_ent";
 /** LINKEDOUT_COOKIE_SECRET is preferred; LINKEDOUT_SALT is the fallback — see anonHash()
  *  in db.ts for why keeping this separate from the hashing key matters. */
 function secret(): string {
-  return process.env.LINKEDOUT_COOKIE_SECRET ?? process.env.LINKEDOUT_SALT ?? "dev-salt-change-me";
+  return resolveSecret(process.env.LINKEDOUT_COOKIE_SECRET, process.env.LINKEDOUT_SALT);
 }
 
 /**

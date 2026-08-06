@@ -209,7 +209,9 @@ doesn't; and that `newStoriesSinceFollow()` only counts what actually happened a
 Copy `.env.example` to `.env.local`. Two settings matter in production:
 
 - `LINKEDOUT_SALT` — the salt for every anonymous hash and the HMAC key for entitlement and
-  moderator cookies. Set it to something long and random.
+  moderator cookies. Set it to something long and random. `.env.example` ships this blank, not
+  prefilled — a placeholder value in a public example file is a value an attacker already has, and
+  the app refuses to start in production (`src/instrumentation.ts`) without a real one configured.
 - `LINKEDOUT_ADMIN_TOKEN` — enables `/admin`. Unset means no admin surface exists.
 
 Never set `LINKEDOUT_DEMO_UNLOCK` on a deployment that charges people.
