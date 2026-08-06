@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getReceipts, getStory, listStories } from "@/lib/db";
+import { getComments, getReceipts, getStory, listStories } from "@/lib/db";
 import { ReasonChip, StoryCard } from "@/components/StoryCard";
 import { EchoButton } from "@/components/EchoButton";
 import { ReportButton } from "@/components/ReportButton";
+import { ShareButton } from "@/components/ShareButton";
+import { CommentSection } from "@/components/CommentSection";
 import { ReceiptStack } from "@/components/ReceiptCard";
 import { relativeTime } from "@/lib/format";
 import { tenureLabel } from "@/lib/taxonomy";
+import { initialsFromPseudonym } from "@/lib/identity";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +56,7 @@ export default async function StoryPage({
   }
 
   const receipts = getReceipts(story.id);
+  const comments = getComments(story.id);
   const alsoAtCompany = listStories({ companySlug: story.company_slug, limit: 4 }).filter(
     (s) => s.id !== story.id,
   );
@@ -70,27 +74,37 @@ export default async function StoryPage({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 label-xs">
-          <Link href={`/companies/${story.company_slug}`} className="text-acid hover:underline">
-            {story.company_name}
-          </Link>
-          <span aria-hidden>/</span>
-          <span>
-            {story.seniority} · {story.role_family}
-          </span>
-          <span aria-hidden>/</span>
-          <span>stayed {tenureLabel(story.tenure_months)}</span>
-          {story.region && (
-            <>
-              <span aria-hidden>/</span>
-              <span>{story.region}</span>
-            </>
-          )}
-          <span aria-hidden>/</span>
-          <time dateTime={story.created_at}>{relativeTime(story.created_at)}</time>
+        <div className="flex items-start gap-3">
+          <div
+            aria-hidden
+            className="grid size-11 shrink-0 place-items-center rounded-full bg-line font-mono text-sm text-muted"
+          >
+            {initialsFromPseudonym(story.pseudonym)}
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold">{story.pseudonym}</p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 label-xs">
+              <span>
+                {story.seniority} {story.role_family} at{" "}
+              </span>
+              <Link href={`/companies/${story.company_slug}`} className="text-acid hover:underline">
+                {story.company_name}
+              </Link>
+              <span aria-hidden>·</span>
+              <span>stayed {tenureLabel(story.tenure_months)}</span>
+              {story.region && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>{story.region}</span>
+                </>
+              )}
+              <span aria-hidden>·</span>
+              <time dateTime={story.created_at}>{relativeTime(story.created_at)}</time>
+            </div>
+          </div>
         </div>
 
-        <h1 className="mt-3 text-3xl font-bold leading-tight">{story.headline}</h1>
+        <h1 className="mt-4 text-3xl font-bold leading-tight">{story.headline}</h1>
 
         <div className="mt-5 flex flex-wrap gap-2">
           {story.reasons.map((c) => (
@@ -104,13 +118,18 @@ export default async function StoryPage({
 
         <ReceiptStack receipts={receipts} />
 
-        <div className="mt-8 flex flex-wrap items-center gap-4 border-t border-line pt-5">
+        <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-line pt-5">
           <EchoButton storyId={story.id} initial={story.echoes} />
+          <ShareButton url={`/stories/${story.id}`} title={story.headline} />
           <ReportButton storyId={story.id} />
           <span className="ml-auto font-mono text-xs text-muted">
             severity {story.severity}/5
             {story.warn_friend && <span className="text-ember"> · would warn a friend off</span>}
           </span>
+        </div>
+
+        <div id="comments">
+          <CommentSection storyId={story.id} initial={comments} />
         </div>
 
         {alsoAtCompany.length > 0 && (

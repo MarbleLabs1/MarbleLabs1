@@ -8,7 +8,7 @@ import {
   recentPostCount,
   upsertCompany,
 } from "@/lib/db";
-import { screen } from "@/lib/moderation";
+import { screen, screenShort } from "@/lib/moderation";
 import { looksAfterHours } from "@/lib/receipts";
 import { json, requesterHash } from "@/lib/request";
 import { REASON_CODES, ROLE_FAMILIES, SENIORITIES, SIZE_BUCKETS } from "@/lib/taxonomy";
@@ -109,10 +109,8 @@ export async function POST(req: Request) {
   // Receipts get screened as hard as the story: a quoted chat message is exactly where a
   // real name or an email address slips through.
   const receiptFindings = (input.receipts ?? []).flatMap((r, i) => {
-    const res = screen({ headline: r.subject ?? "Receipt", body: r.content.padEnd(120, " ") });
-    return res.findings
-      .filter((f) => f.code !== "too_short")
-      .map((f) => ({ ...f, message: `Receipt ${i + 1}: ${f.message}` }));
+    const res = screenShort({ label: r.subject ?? "Receipt", body: r.content });
+    return res.findings.map((f) => ({ ...f, message: `Receipt ${i + 1}: ${f.message}` }));
   });
 
   const allFindings = [...verdict.findings, ...receiptFindings];

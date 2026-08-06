@@ -40,6 +40,12 @@ no single story can show, and the one an employer cannot explain away as a perso
 
 **Company reports** — exits broken out by department, level and tenure, plus trend over time.
 
+**Feels like a feed, not a dashboard.** A composer bar at the top of the feed, a pseudonym and avatar
+on every story ("Blunt Associate #7825" — deterministic from the post's hash, never the same as an
+identity, never reversible), comments under a story, follow a company for a "new since you followed"
+badge, and a share button. "Same here" stays the one reaction — see below for why that was a
+deliberate choice, not an oversight.
+
 ---
 
 ## Where the important decisions live
@@ -51,6 +57,8 @@ no single story can show, and the one an employer cannot explain away as a perso
 | Every SQL query | `src/lib/db.ts` | All of it, in one file, so the eventual Postgres migration is a one-file job. |
 | Pricing and entitlements | `src/lib/billing.ts` | Plans, Stripe wiring, HMAC-signed access cookies. |
 | Moderator access | `src/lib/admin-token.ts` | Token and session crypto, free of Next imports so it is unit-testable. Fails closed. |
+| Pseudonyms | `src/lib/identity.ts` | Deterministic label from a hash, never the hash itself. Two different posters can land on the same pseudonym — a "unique-looking" anonymous handle would quietly become a fingerprint. |
+| Following | `src/lib/follows.ts` | An unsigned opaque cookie, not requesterHash()'s anti-spoofing machinery — following has no scarce resource to protect, so it doesn't need it. |
 
 ---
 
@@ -94,6 +102,14 @@ with no server-side Stripe code. Until then `/api/checkout` records a hashed ema
 entry and says plainly that billing is not live — an email you can convert later beats a broken card
 form. Entitlements ride in an HMAC-signed cookie, so nobody grants themselves the paid tier by
 editing devtools.
+
+### Why there is one reaction, not five
+
+Comments, follows, shares and pseudonyms make this feel like a feed on purpose. "Same here" staying
+the *only* reaction is the one place that stops short of copying LinkedIn: a proliferation of
+reaction types is exactly the vanity-metrics pattern this site exists to be the opposite of. One
+strong, meaningful signal — a corroborating account, not an emoji — is worth more than five weak
+ones, and it is also the number the Exit Index is allowed to trust.
 
 ---
 
@@ -147,8 +163,12 @@ password because someone forgot an env var is how moderation tools end up public
 for one or two moderators; at five you want per-moderator accounts so the log records *who* decided.
 Rotating `LINKEDOUT_SALT` signs everyone out, which is the fast revoke.
 
-**Still missing before this goes live for real:** a published takedown contact, and a lawyer's read
-of the guidelines in your jurisdiction.
+**Still missing before this goes live for real:** a published takedown contact, a lawyer's read of
+the guidelines in your jurisdiction, and comments in `/admin`. Comments go through the same
+`screenShort()` screening as stories — a flagged comment is held (`status='review'`) and never shown
+by `getComments()` — but the queue only lists stories right now, so a held comment has nowhere for a
+moderator to actually resolve it. Same shape of gap the story queue had before `/admin` existed;
+extending `listQueue()` to comments is the next thing to build, not a silent hole.
 
 ---
 
@@ -168,18 +188,19 @@ npm run dev          # dev server
 npm run build        # production build
 npm run seed         # add example data
 npm run seed:reset   # wipe, then add example data
-npm test             # unit tests — screening, after-hours, Exit Index, moderation queue, admin auth
+npm test             # unit tests — screening, after-hours, Exit Index, moderation queue, admin auth, social
 npm run e2e          # browser test of the full post flow (needs a server running)
 npm run typecheck    # tsc --noEmit
 npm run lint
 ```
 
-41 tests over the things that must not silently break: what screening blocks and what it merely
+79 tests over the things that must not silently break: what screening blocks and what it merely
 flags; whether a 6:47pm invite counts as after-hours (18:47 — an hour boundary of 19:00 would miss
 exactly the case the feature exists for); that the Exit Index withholds a score below three stories
 and never punishes a company for volume alone; that one person reporting six times hides nothing
-while three people reporting once each does; and that a forged, expired, or salt-rotated moderator
-cookie is refused.
+while three people reporting once each does; that a forged, expired, or salt-rotated moderator
+cookie is refused; that a short comment passes screening while a named individual in it still
+doesn't; and that `newStoriesSinceFollow()` only counts what actually happened after the follow.
 
 ## Configuration
 

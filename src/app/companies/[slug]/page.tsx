@@ -3,19 +3,24 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   afterHoursRate,
+  commentCounts,
   detectExodus,
   exitBreakdown,
   firstReceipts,
   getCompanyBySlug,
   getCompanyStats,
+  isFollowing,
   listStories,
   MIN_STORIES_FOR_INDEX,
+  newStoriesSinceFollow,
   receiptCounts,
 } from "@/lib/db";
 import { REASON_MAP, reasonLabel, tenureLabel } from "@/lib/taxonomy";
 import { StoryCard } from "@/components/StoryCard";
+import { FollowButton } from "@/components/FollowButton";
 import { indexBand, pct } from "@/lib/format";
 import { hasPaidAccess } from "@/lib/access";
+import { currentFollowerId } from "@/lib/follows";
 import { Paywall } from "@/components/Paywall";
 
 export const dynamic = "force-dynamic";
@@ -86,11 +91,14 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
   const stats = getCompanyStats(slug, weightFor);
   const stories = listStories({ companySlug: slug, sort: "echoed", limit: 25 });
   const ids = stories.map((s) => s.id);
-  const [counts, previews] = [receiptCounts(ids), firstReceipts(ids)];
+  const [counts, cComments, previews] = [receiptCounts(ids), commentCounts(ids), firstReceipts(ids)];
   const exodus = detectExodus(slug);
   const receipts = afterHoursRate(slug);
   const paid = await hasPaidAccess();
   const band = indexBand(stats?.exit_index ?? null);
+  const followerId = await currentFollowerId();
+  const following = isFollowing(followerId, slug);
+  const newSinceFollow = following ? newStoriesSinceFollow(followerId, slug) : 0;
 
   if (!stats || stats.story_count === 0) {
     return (
@@ -113,6 +121,12 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
           <h1 className="text-3xl font-bold">{company.name}</h1>
           {company.industry && <span className="label-xs">{company.industry}</span>}
           {company.size_bucket && <span className="label-xs">{company.size_bucket} people</span>}
+          <FollowButton companySlug={slug} initial={following} />
+          {newSinceFollow > 0 && (
+            <span className="rounded-full border border-acid/50 bg-acid/10 px-2 py-0.5 font-mono text-[11px] text-acid">
+              {newSinceFollow} new since you followed
+            </span>
+          )}
         </div>
         <p className={`mt-3 max-w-2xl text-[15px] ${band.color}`}>
           <strong>{band.label}.</strong>{" "}
@@ -168,6 +182,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
                 key={s.id}
                 story={s}
                 receiptCount={counts[s.id] ?? 0}
+                commentCount={cComments[s.id] ?? 0}
                 previewReceipt={previews[s.id]}
               />
             ))}

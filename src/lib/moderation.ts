@@ -104,6 +104,22 @@ export function redactContactDetails(text: string): string {
     .replace(PHONE, (m) => (isPhoneLike(m) ? "[number removed]" : m));
 }
 
+/**
+ * Screens a short piece of text — a receipt, a comment — that would otherwise trip
+ * the MIN_BODY floor meant for full stories. Pads before screening so `screen()`'s
+ * own length check never fires, then drops that specific finding: everything else it
+ * catches (names, contact details, allegations) still applies at full strength, since
+ * a comment is exactly where "my manager Karen still works there" fits in one sentence.
+ */
+export function screenShort(input: { label: string; body: string }): ScreenResult {
+  const result = screen({ headline: input.label, body: input.body });
+  const findings = result.findings.filter((f) => f.code !== "too_short");
+  // ok has to be recomputed from the filtered list, not copied from screen()'s result:
+  // too_short is a block-action finding, and if it was the only one, the stale ok would
+  // stay false even though nothing left in findings actually blocks anything.
+  return { ...result, findings, ok: !findings.some((f) => f.action === "block") };
+}
+
 export function screen(input: { headline: string; body: string }): ScreenResult {
   const findings: Finding[] = [];
   const headline = input.headline.trim();

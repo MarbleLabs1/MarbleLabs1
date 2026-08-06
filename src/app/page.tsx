@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { firstReceipts, globalStats, listStories, receiptCounts, receiptWall } from "@/lib/db";
+import { commentCounts, firstReceipts, globalStats, listStories, receiptCounts, receiptWall } from "@/lib/db";
 import { REASONS, ROLE_FAMILIES, reasonLabel } from "@/lib/taxonomy";
 import { StoryCard } from "@/components/StoryCard";
 import { ReceiptCard } from "@/components/ReceiptCard";
@@ -74,6 +74,7 @@ export default async function Home({
   const stories = listStories({ reason: sp.reason, role: sp.role, sort, limit: 30 });
   const ids = stories.map((s) => s.id);
   const counts = receiptCounts(ids);
+  const cComments = commentCounts(ids);
   const previews = firstReceipts(ids);
   const wall = receiptWall(6);
 
@@ -117,6 +118,19 @@ export default async function Home({
 
       <div className="grid gap-8 lg:grid-cols-[1fr_18rem]">
         <div>
+          <Link
+            href="/submit"
+            className="card mb-4 flex items-center gap-3 p-3.5 text-sm text-muted transition-colors hover:border-acid hover:text-paper"
+          >
+            <span
+              aria-hidden
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-line font-mono text-[11px] text-muted"
+            >
+              ??
+            </span>
+            What happened at your last job?
+          </Link>
+
           <div className="mb-4 flex flex-wrap items-center gap-2">
             {SORTS.map((s) => (
               <Link
@@ -164,6 +178,7 @@ export default async function Home({
                   key={s.id}
                   story={s}
                   receiptCount={counts[s.id] ?? 0}
+                  commentCount={cComments[s.id] ?? 0}
                   previewReceipt={previews[s.id]}
                 />
               ))}

@@ -3,7 +3,9 @@ import type { Receipt, Story } from "@/lib/db";
 import { REASON_MAP, tenureLabel } from "@/lib/taxonomy";
 import { EchoButton } from "./EchoButton";
 import { ReceiptCard } from "./ReceiptCard";
+import { ShareButton } from "./ShareButton";
 import { relativeTime } from "@/lib/format";
+import { initialsFromPseudonym } from "@/lib/identity";
 
 function SeverityBar({ value }: { value: number }) {
   return (
@@ -35,15 +37,48 @@ export function ReasonChip({ code }: { code: string }) {
   );
 }
 
+/** The pseudonym + role/tenure line that makes a card read as "someone posted this",
+ *  not "a database row rendered this" — see src/lib/identity.ts for what it is and isn't. */
+function PostHeader({ story }: { story: Story }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <div
+        aria-hidden
+        className="grid size-9 shrink-0 place-items-center rounded-full bg-line font-mono text-[11px] text-muted"
+      >
+        {initialsFromPseudonym(story.pseudonym)}
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold leading-tight">{story.pseudonym}</p>
+        <p className="mt-0.5 label-xs">
+          {story.seniority} {story.role_family} at{" "}
+          <Link href={`/companies/${story.company_slug}`} className="text-acid hover:underline">
+            {story.company_name}
+          </Link>{" "}
+          · stayed {tenureLabel(story.tenure_months)}
+        </p>
+      </div>
+      <div className="ml-auto flex shrink-0 items-center gap-2.5 pt-0.5">
+        <SeverityBar value={story.severity} />
+        <time dateTime={story.created_at} className="label-xs whitespace-nowrap">
+          {relativeTime(story.created_at)}
+        </time>
+      </div>
+    </div>
+  );
+}
+
 export function StoryCard({
   story,
   excerpt = true,
   receiptCount = 0,
+  commentCount = 0,
   previewReceipt,
 }: {
   story: Story;
   excerpt?: boolean;
   receiptCount?: number;
+  commentCount?: number;
   /** First receipt, shown inline — a 6:47pm invite stops the scroll where a paragraph does not. */
   previewReceipt?: Receipt;
 }) {
@@ -51,26 +86,13 @@ export function StoryCard({
 
   return (
     <article className="card p-5">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 label-xs">
-        <Link href={`/companies/${story.company_slug}`} className="text-acid hover:underline">
-          {story.company_name}
-        </Link>
-        <span aria-hidden>/</span>
-        <span>{story.role_family}</span>
-        <span aria-hidden>/</span>
-        <span>{story.seniority}</span>
-        <span aria-hidden>/</span>
-        <span>stayed {tenureLabel(story.tenure_months)}</span>
-        <span className="ml-auto flex items-center gap-3">
-          {receiptCount > 0 && !previewReceipt && (
-            <span className="rounded-full border border-acid/50 bg-acid/10 px-2 py-0.5 text-[10px] text-acid">
-              {receiptCount} receipt{receiptCount === 1 ? "" : "s"}
-            </span>
-          )}
-          <SeverityBar value={story.severity} />
-          <time dateTime={story.created_at}>{relativeTime(story.created_at)}</time>
+      <PostHeader story={story} />
+
+      {receiptCount > 0 && !previewReceipt && (
+        <span className="mt-3 inline-block rounded-full border border-acid/50 bg-acid/10 px-2 py-0.5 font-mono text-[10px] text-acid">
+          {receiptCount} receipt{receiptCount === 1 ? "" : "s"}
         </span>
-      </div>
+      )}
 
       <h2 className="mt-3 text-lg font-semibold leading-snug">
         <Link href={`/stories/${story.id}`} className="hover:text-acid">
@@ -106,11 +128,20 @@ export function StoryCard({
         ))}
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
+      {story.warn_friend && (
+        <p className="mt-3 font-mono text-[11px] text-ember">would warn a friend off</p>
+      )}
+
+      <div className="mt-4 flex items-center gap-2 border-t border-line pt-3">
         <EchoButton storyId={story.id} initial={story.echoes} />
-        {story.warn_friend && (
-          <span className="font-mono text-[11px] text-ember">would warn a friend off</span>
-        )}
+        <Link
+          href={`/stories/${story.id}#comments`}
+          className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 font-mono text-xs text-muted transition-colors hover:border-acid hover:text-acid"
+        >
+          <span aria-hidden>◇</span>
+          <span>{commentCount > 0 ? `${commentCount} comment${commentCount === 1 ? "" : "s"}` : "comment"}</span>
+        </Link>
+        <ShareButton url={`/stories/${story.id}`} title={story.headline} />
       </div>
     </article>
   );

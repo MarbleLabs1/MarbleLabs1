@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { pseudonymFor } from "./identity.ts";
 
 /**
  * SQLite via better-sqlite3. Single file, synchronous, no service to run — the right
@@ -105,6 +106,24 @@ function migrate(d: Database.Database) {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_modlog_story ON moderation_log(story_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS comments (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      story_id    TEXT NOT NULL REFERENCES stories(id),
+      body        TEXT NOT NULL,
+      status      TEXT NOT NULL DEFAULT 'published', -- published | review | removed
+      findings    TEXT NOT NULL DEFAULT '[]',
+      author_hash TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_comments_story ON comments(story_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS follows (
+      follower_id TEXT NOT NULL,
+      company_id  INTEGER NOT NULL REFERENCES companies(id),
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (follower_id, company_id)
+    );
   `);
 }
 
@@ -194,28 +213,37 @@ export type StoryRow = {
   status: string;
   created_at: string;
   echoes: number;
+  author_hash: string;
 };
 
-export type Story = Omit<StoryRow, "reasons" | "warn_friend"> & {
+export type Story = Omit<StoryRow, "reasons" | "warn_friend" | "author_hash"> & {
   reasons: string[];
   warn_friend: boolean;
+  /** A label, not an identity — see src/lib/identity.ts. Never the raw author_hash. */
+  pseudonym: string;
 };
 
 function hydrate(row: StoryRow): Story {
-  const { reasons, warn_friend, ...rest } = row;
+  const { reasons, warn_friend, author_hash, ...rest } = row;
   let parsed: string[] = [];
   try {
     parsed = JSON.parse(reasons);
   } catch {
     parsed = [];
   }
-  return { ...rest, reasons: parsed, warn_friend: warn_friend === 1 };
+  return {
+    ...rest,
+    reasons: parsed,
+    warn_friend: warn_friend === 1,
+    pseudonym: pseudonymFor(author_hash),
+  };
 }
 
 const STORY_SELECT = `
   SELECT s.id, s.company_id, c.name AS company_name, c.slug AS company_slug,
          s.headline, s.body, s.role_family, s.seniority, s.tenure_months,
          s.reasons, s.severity, s.warn_friend, s.region, s.status, s.created_at,
+         s.author_hash,
          (SELECT COUNT(*) FROM echoes e WHERE e.story_id = s.id) AS echoes
   FROM stories s JOIN companies c ON c.id = s.company_id
 `;
@@ -908,7 +936,7 @@ export function listQueue(): QueueItem[] {
       `SELECT s.id, s.company_id, c.name AS company_name, c.slug AS company_slug,
               s.headline, s.body, s.role_family, s.seniority, s.tenure_months,
               s.reasons, s.severity, s.warn_friend, s.region, s.status, s.created_at,
-              s.findings AS raw_findings,
+              s.author_hash, s.findings AS raw_findings,
               (SELECT COUNT(*) FROM echoes e WHERE e.story_id = s.id) AS echoes
        FROM stories s JOIN companies c ON c.id = s.company_id
        WHERE s.status = 'review'
@@ -1042,4 +1070,129 @@ export function recentDecisions(limit = 20): LogEntry[] {
        ORDER BY l.created_at DESC, l.id DESC LIMIT ?`,
     )
     .all(limit) as LogEntry[];
+}
+
+/* ── Comments ──────────────────────────────────────────────────────────────────
+ *
+ * A comment is a much smaller commitment than a full story, which is exactly why it
+ * carries the same doxxing risk on a smaller budget of words: "my manager Karen still
+ * works there" fits in a sentence. Comments go through the same screen() used for
+ * stories — the length floor is bypassed the same way receipts bypass it (pad, screen,
+ * drop the too_short finding), not by relaxing what gets blocked.
+ */
+
+export type Comment = {
+  id: number;
+  body: string;
+  created_at: string;
+  pseudonym: string;
+};
+
+export function insertComment(input: {
+  story_id: string;
+  body: string;
+  status: string;
+  findings: unknown;
+  author_hash: string;
+}): number {
+  const info = db()
+    .prepare(
+      `INSERT INTO comments (story_id, body, status, findings, author_hash) VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(
+      input.story_id,
+      input.body,
+      input.status,
+      JSON.stringify(input.findings ?? []),
+      input.author_hash,
+    );
+  return Number(info.lastInsertRowid);
+}
+
+export function getComments(storyId: string): Comment[] {
+  const rows = db()
+    .prepare(
+      `SELECT id, body, author_hash, created_at FROM comments
+       WHERE story_id = ? AND status = 'published' ORDER BY created_at ASC`,
+    )
+    .all(storyId) as { id: number; body: string; author_hash: string; created_at: string }[];
+  return rows.map((r) => ({
+    id: r.id,
+    body: r.body,
+    created_at: r.created_at,
+    pseudonym: pseudonymFor(r.author_hash),
+  }));
+}
+
+/** For the feed: one query for every visible story's comment count, not one each. */
+export function commentCounts(storyIds: string[]): Record<string, number> {
+  if (storyIds.length === 0) return {};
+  const placeholders = storyIds.map(() => "?").join(",");
+  const rows = db()
+    .prepare(
+      `SELECT story_id, COUNT(*) AS n FROM comments
+       WHERE story_id IN (${placeholders}) AND status = 'published' GROUP BY story_id`,
+    )
+    .all(...storyIds) as { story_id: string; n: number }[];
+  return Object.fromEntries(rows.map((r) => [r.story_id, r.n]));
+}
+
+export function recentCommentCount(authorHash: string, hours = 24): number {
+  return (
+    db()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM comments WHERE author_hash = ? AND created_at > datetime('now', ?)`,
+      )
+      .get(authorHash, `-${hours} hours`) as { n: number }
+  ).n;
+}
+
+/* ── Follows ───────────────────────────────────────────────────────────────────
+ *
+ * follower_id is an opaque random token in a cookie (src/lib/follows.ts), not derived
+ * from anything identifying. Unlike echoes and reports, following has no scarce
+ * resource to protect and no metric anyone can game to hurt someone else — a forged
+ * or duplicated follower_id just means a browser sees the wrong "Following" state for
+ * itself, so this deliberately skips the anti-spoofing machinery requesterHash()
+ * exists for.
+ */
+
+export function follow(followerId: string, companySlug: string): { ok: boolean } {
+  const company = getCompanyBySlug(companySlug);
+  if (!company) return { ok: false };
+  db()
+    .prepare(`INSERT OR IGNORE INTO follows (follower_id, company_id) VALUES (?, ?)`)
+    .run(followerId, company.id);
+  return { ok: true };
+}
+
+export function unfollow(followerId: string, companySlug: string): void {
+  const company = getCompanyBySlug(companySlug);
+  if (!company) return;
+  db().prepare(`DELETE FROM follows WHERE follower_id = ? AND company_id = ?`).run(followerId, company.id);
+}
+
+export function isFollowing(followerId: string | null, companySlug: string): boolean {
+  if (!followerId) return false;
+  const company = getCompanyBySlug(companySlug);
+  if (!company) return false;
+  const row = db()
+    .prepare(`SELECT 1 FROM follows WHERE follower_id = ? AND company_id = ?`)
+    .get(followerId, company.id);
+  return Boolean(row);
+}
+
+/** Stories published after this browser followed the company — the "new" badge. */
+export function newStoriesSinceFollow(followerId: string | null, companySlug: string): number {
+  if (!followerId) return 0;
+  const company = getCompanyBySlug(companySlug);
+  if (!company) return 0;
+  const row = db()
+    .prepare(
+      `SELECT COUNT(*) AS n FROM stories s
+       JOIN follows f ON f.company_id = s.company_id AND f.follower_id = ?
+       WHERE s.company_id = ? AND s.status = 'published' AND s.created_at > f.created_at`,
+    )
+    .get(followerId, company.id) as { n: number };
+  return row.n;
 }
