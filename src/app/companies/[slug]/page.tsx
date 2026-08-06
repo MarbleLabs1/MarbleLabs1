@@ -105,9 +105,12 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
       <div className="card mx-auto max-w-xl p-8 text-center">
         <h1 className="text-2xl font-bold">{company.name}</h1>
         <p className="mt-3 text-paper/75">No published stories for this company yet.</p>
-        <Link href="/submit" className="mt-6 inline-block text-acid hover:underline">
-          Be the first →
-        </Link>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Link href="/submit" className="text-acid hover:underline">
+            Be the first →
+          </Link>
+          <FollowButton companySlug={slug} initial={following} />
+        </div>
       </div>
     );
   }

@@ -2,12 +2,15 @@ import { anonHash } from "./db.ts";
 
 /**
  * Number of reverse proxies between the internet and this app that are trusted to
- * append their own hop to `x-forwarded-for` without letting the client control it.
- * Vercel, a single nginx/Cloudflare edge, and most standard setups are exactly one
- * hop, hence the default. Set LINKEDOUT_TRUSTED_PROXIES=0 if this app is reachable
- * directly with nothing in front of it, or a higher number for a longer trusted
- * chain — get this wrong in either direction and requesterHash() below becomes
- * either spoofable or useless.
+ * append their own hop to `x-forwarded-for` (and to strip/overwrite any client-sent
+ * `cf-connecting-ip` or `x-real-ip`) before it reaches this code. Defaults to 0 —
+ * trust nothing — because the wrong default in the other direction is a security
+ * hole, not a usability regression: an unset/misconfigured value should degrade to
+ * "share one identity bucket", never to "trust whatever the client claims".
+ *
+ * Vercel, a single nginx or Cloudflare edge, and most standard setups are exactly one
+ * hop, so set this to 1 for those. Get it wrong in the other direction — trusting a
+ * hop or header nothing actually strips — and requesterHash() below becomes spoofable.
  *
  * Read inside the function, not hoisted to a module-level constant: a constant would
  * freeze whatever the env var happened to be at first import, which is invisible in
@@ -15,7 +18,11 @@ import { anonHash } from "./db.ts";
  * set the var per case.
  */
 function trustedProxyDepth(): number {
-  return Number(process.env.LINKEDOUT_TRUSTED_PROXIES ?? "1");
+  const raw = Number(process.env.LINKEDOUT_TRUSTED_PROXIES ?? "0");
+  // A typo'd non-numeric value must not silently become 0 via NaN falling through
+  // comparisons — that would still collapse every caller into one shared bucket, just
+  // via a different path, and do it invisibly. Fail the same safe way on purpose.
+  return Number.isInteger(raw) && raw >= 0 ? raw : 0;
 }
 
 /**
@@ -30,6 +37,12 @@ function trustedProxyDepth(): number {
  * the more common mistake — lets any caller pick a fresh identity on every request by
  * sending a fresh header, which silently defeats every one of the checks above it.
  *
+ * `cf-connecting-ip` and `x-real-ip` are single-value headers a well-configured edge
+ * sets and strips any client-sent copy of — but that guarantee only exists once a
+ * trusted proxy is actually configured. With no proxy in front (depth 0), a direct
+ * caller can set either header to anything, so they get exactly the same trust
+ * treatment as x-forwarded-for: none, unless depth says otherwise.
+ *
  * User-Agent is deliberately excluded from the hash. It looks like it reduces
  * shared-NAT false collisions, but it does the opposite for security: once the IP hop
  * is trustworthy, a caller behind one real IP could still mint a new identity per
@@ -37,14 +50,16 @@ function trustedProxyDepth(): number {
  * exists to close.
  */
 export function requesterHash(req: Request): string {
-  const direct = req.headers.get("cf-connecting-ip")?.trim() || req.headers.get("x-real-ip")?.trim();
-  if (direct) return anonHash(direct);
+  const depth = trustedProxyDepth();
+  if (depth > 0) {
+    const direct = req.headers.get("cf-connecting-ip")?.trim() || req.headers.get("x-real-ip")?.trim();
+    if (direct) return anonHash(direct);
+  }
 
   const hops = (req.headers.get("x-forwarded-for") ?? "")
     .split(",")
     .map((h) => h.trim())
     .filter(Boolean);
-  const depth = trustedProxyDepth();
   const ip = depth > 0 && hops.length >= depth ? hops[hops.length - depth] : "unknown";
   return anonHash(ip);
 }

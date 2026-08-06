@@ -151,6 +151,11 @@ test("moderate() refuses a removal with no reason, even bypassing the API route"
 test("moderate() accepts approve and restore with no note", () => {
   makeStory("noreason2", "review");
   assert.equal(D.moderate("noreason2", "approve").ok, true);
+
+  makeStory("noreason3", "removed");
+  const restored = D.moderate("noreason3", "restore");
+  assert.equal(restored.ok, true);
+  assert.equal(restored.status, "published");
 });
 
 test("listCompanyStats ranks by exit_index even when SQL's simpler order would have cut a company first", () => {

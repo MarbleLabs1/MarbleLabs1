@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { adminEnabled, isModerator } from "@/lib/admin";
-import { listQueue, queueSize, recentDecisions } from "@/lib/db";
+import { commentQueueSize, listCommentQueue, listQueue, queueSize, recentDecisions } from "@/lib/db";
 import { reasonLabel, tenureLabel } from "@/lib/taxonomy";
 import { relativeTime } from "@/lib/format";
 import { LoginForm } from "./LoginForm";
 import { QueueItemCard } from "./QueueItemCard";
+import { CommentQueueCard } from "./CommentQueueCard";
 import { SignOut } from "./SignOut";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export default async function AdminPage() {
   }
 
   const queue = listQueue();
+  const commentQueue = listCommentQueue();
   const decisions = recentDecisions(15);
 
   return (
@@ -108,6 +110,38 @@ export default async function AdminPage() {
       )}
 
       <section className="mt-12">
+        <h2 className="label-xs">
+          {commentQueue.length === 0
+            ? "Held comments — none waiting"
+            : `Held comments — ${commentQueue.length} waiting`}
+        </h2>
+        {commentQueue.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">
+            Comments screening flags land here for the same reason stories do — usually an
+            allegation of unlawful conduct.
+          </p>
+        ) : (
+          <div className="mt-4 flex flex-col gap-4">
+            {commentQueue.map((c) => (
+              <CommentQueueCard
+                key={c.id}
+                item={{
+                  id: c.id,
+                  story_id: c.story_id,
+                  story_headline: c.story_headline,
+                  company_name: c.company_name,
+                  body: c.body,
+                  pseudonym: c.pseudonym,
+                  age: relativeTime(c.created_at),
+                  findings: c.findings,
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-12">
         <h2 className="label-xs">Audit log — last {decisions.length || 0} decisions</h2>
         {decisions.length === 0 ? (
           <p className="mt-3 text-sm text-muted">No decisions recorded yet.</p>
@@ -156,7 +190,8 @@ export default async function AdminPage() {
       </section>
 
       <p className="mt-8 font-mono text-[11px] text-muted">
-        {queueSize()} in queue · session expires 12h after sign-in
+        {queueSize()} stories · {commentQueueSize()} comments in queue · session expires 12h after
+        sign-in
       </p>
     </>
   );

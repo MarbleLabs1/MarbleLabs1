@@ -919,7 +919,8 @@ function main() {
     if (reset) {
       // Order matters: every table holding a story_id has to go before stories does,
       // or the foreign keys refuse the delete. Add new child tables to the front.
-      d.exec(`DELETE FROM moderation_log; DELETE FROM receipts; DELETE FROM echoes;
+      d.exec(`DELETE FROM comment_moderation_log; DELETE FROM comments; DELETE FROM follows;
+              DELETE FROM moderation_log; DELETE FROM receipts; DELETE FROM echoes;
               DELETE FROM reports; DELETE FROM stories; DELETE FROM companies;
               DELETE FROM subscribers;`);
       console.log("Wiped existing data.");

@@ -75,16 +75,32 @@ test("a comment held for review does not appear in getComments", () => {
 });
 
 test("commentCounts batches counts for multiple stories in one call", () => {
+  makeStory("social3");
+  makeStory("social4");
   D.insertComment({
-    story_id: "social2",
-    body: "one comment on the second story",
+    story_id: "social3",
+    body: "one comment on the third story",
     status: "published",
     findings: [],
     author_hash: D.anonHash("commenter-3"),
   });
-  const counts = D.commentCounts(["social1", "social2", "does-not-exist"]);
-  assert.equal(counts["social1"], 1);
-  assert.equal(counts["social2"], 1);
+  D.insertComment({
+    story_id: "social4",
+    body: "one published comment on the fourth story",
+    status: "published",
+    findings: [],
+    author_hash: D.anonHash("commenter-4"),
+  });
+  D.insertComment({
+    story_id: "social4",
+    body: "a held comment that must not be counted",
+    status: "review",
+    findings: [{ action: "flag", code: "allegation", message: "x" }],
+    author_hash: D.anonHash("commenter-5"),
+  });
+  const counts = D.commentCounts(["social3", "social4", "does-not-exist"]);
+  assert.equal(counts["social3"], 1);
+  assert.equal(counts["social4"], 1);
   assert.equal(counts["does-not-exist"], undefined);
 });
 

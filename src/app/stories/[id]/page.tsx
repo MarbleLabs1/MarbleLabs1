@@ -21,7 +21,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const story = getStory(id);
-  if (!story) return { title: "Story not found" };
+  // A story held for review or removed must not leak its headline or body into page
+  // metadata — that is a public HTML response regardless of what the page body renders,
+  // and it would bypass the same moderation boundary the page itself respects below.
+  if (!story || story.status !== "published") return { title: "Story not available" };
   return {
     title: story.headline,
     description: `${story.role_family} at ${story.company_name} — ${story.body.slice(0, 150)}…`,

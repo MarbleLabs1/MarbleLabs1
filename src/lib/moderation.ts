@@ -105,18 +105,27 @@ export function redactContactDetails(text: string): string {
 }
 
 /**
- * Screens a short piece of text — a receipt, a comment — that would otherwise trip
- * the MIN_BODY floor meant for full stories. Pads before screening so `screen()`'s
- * own length check never fires, then drops that specific finding: everything else it
- * catches (names, contact details, allegations) still applies at full strength, since
- * a comment is exactly where "my manager Karen still works there" fits in one sentence.
+ * screen()'s findings that exist to validate a *headline* — meaningless here, because
+ * screenShort() callers pass either a fixed placeholder ("Comment") or an optional
+ * receipt subject that the API schema already bounds independently (max 140 chars,
+ * allowed to be empty). An empty or 130-char subject is not a defect in the receipt;
+ * treating it as one is what "too_short" alone used to miss — an empty subject still
+ * tripped no_headline, and a 130-char one still tripped headline_long.
+ */
+const HEADLINE_ONLY_CODES = new Set(["too_short", "no_headline", "headline_long"]);
+
+/**
+ * Screens a short piece of text — a receipt, a comment — through the same checks a
+ * full story gets (names, contact details, allegations), minus the length/headline
+ * rules meant for a story's own headline and body, which do not apply to a comment or
+ * a receipt's optional subject line.
  */
 export function screenShort(input: { label: string; body: string }): ScreenResult {
   const result = screen({ headline: input.label, body: input.body });
-  const findings = result.findings.filter((f) => f.code !== "too_short");
+  const findings = result.findings.filter((f) => !HEADLINE_ONLY_CODES.has(f.code));
   // ok has to be recomputed from the filtered list, not copied from screen()'s result:
-  // too_short is a block-action finding, and if it was the only one, the stale ok would
-  // stay false even though nothing left in findings actually blocks anything.
+  // every excluded code is a block-action finding, and if one was the only finding, the
+  // stale ok would stay false even though nothing left in findings actually blocks anything.
   return { ...result, findings, ok: !findings.some((f) => f.action === "block") };
 }
 

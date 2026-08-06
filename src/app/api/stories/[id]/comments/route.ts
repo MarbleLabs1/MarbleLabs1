@@ -18,7 +18,10 @@ const CreateComment = z.object({
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!getStory(id)) return json({ error: "No such story." }, 404);
+  const story = getStory(id);
+  // Matches the boundary POST already enforces: once a story is held or removed,
+  // nothing about it — including its comments — should still be fetchable here.
+  if (!story || story.status !== "published") return json({ error: "No such story." }, 404);
   return json({ comments: getComments(id) });
 }
 

@@ -124,6 +124,16 @@ function migrate(d: Database.Database) {
       created_at  TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY (follower_id, company_id)
     );
+
+    CREATE TABLE IF NOT EXISTS comment_moderation_log (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      comment_id  INTEGER NOT NULL REFERENCES comments(id),
+      action      TEXT NOT NULL,          -- approve | remove
+      note        TEXT,
+      from_status TEXT NOT NULL,
+      to_status   TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 }
 
@@ -131,10 +141,14 @@ function migrate(d: Database.Database) {
  * Posters are anonymous, so we never store an IP. We store a salted hash of it,
  * which is enough to rate-limit and to stop one person echoing their own story
  * a hundred times, and useless to anyone who steals the database.
+ *
+ * LINKEDOUT_HASH_KEY is preferred; LINKEDOUT_SALT is the fallback for deployments
+ * that only set one secret. Keeping the hashing key separate from the cookie-signing
+ * key (billing.ts, admin-token.ts) means a leak of one does not also forge the other.
  */
 export function anonHash(value: string): string {
-  const salt = process.env.LINKEDOUT_SALT ?? "dev-salt-change-me";
-  return createHash("sha256").update(`${salt}:${value}`).digest("hex").slice(0, 32);
+  const key = process.env.LINKEDOUT_HASH_KEY ?? process.env.LINKEDOUT_SALT ?? "dev-salt-change-me";
+  return createHash("sha256").update(`${key}:${value}`).digest("hex").slice(0, 32);
 }
 
 export function slugify(name: string): string {
@@ -461,22 +475,30 @@ function reasonCounts(slug: string): { code: string; count: number }[] {
  * whole leaderboard at once, and reasonCounts() per row there would be an N+1 query per
  * page load; this bucket-in-memory version replaces that with one query regardless of N.
  */
+// SQLite caps bound parameters per statement (SQLITE_MAX_VARIABLE_NUMBER — 999 on older
+// builds); listCompanyStats passes every qualifying company's slug here with no limit
+// applied yet, so a platform with more companies than that would blow the cap in one query.
+const SQL_VARIABLE_CHUNK = 500;
+
 function reasonCountsForSlugs(slugs: string[]): Map<string, { code: string; count: number }[]> {
   const buckets = new Map<string, { code: string; count: number }[]>();
   if (slugs.length === 0) return buckets;
-  const placeholders = slugs.map(() => "?").join(",");
-  const rows = db()
-    .prepare(
-      `SELECT c.slug AS slug, j.value AS code, COUNT(*) AS count
-       FROM stories s JOIN companies c ON c.id = s.company_id, json_each(s.reasons) j
-       WHERE c.slug IN (${placeholders}) AND s.status = 'published'
-       GROUP BY c.slug, j.value ORDER BY c.slug, count DESC, code ASC`,
-    )
-    .all(...slugs) as { slug: string; code: string; count: number }[];
-  for (const r of rows) {
-    const bucket = buckets.get(r.slug) ?? [];
-    bucket.push({ code: r.code, count: r.count });
-    buckets.set(r.slug, bucket);
+  for (let i = 0; i < slugs.length; i += SQL_VARIABLE_CHUNK) {
+    const chunk = slugs.slice(i, i + SQL_VARIABLE_CHUNK);
+    const placeholders = chunk.map(() => "?").join(",");
+    const rows = db()
+      .prepare(
+        `SELECT c.slug AS slug, j.value AS code, COUNT(*) AS count
+         FROM stories s JOIN companies c ON c.id = s.company_id, json_each(s.reasons) j
+         WHERE c.slug IN (${placeholders}) AND s.status = 'published'
+         GROUP BY c.slug, j.value ORDER BY c.slug, count DESC, code ASC`,
+      )
+      .all(...chunk) as { slug: string; code: string; count: number }[];
+    for (const r of rows) {
+      const bucket = buckets.get(r.slug) ?? [];
+      bucket.push({ code: r.code, count: r.count });
+      buckets.set(r.slug, bucket);
+    }
   }
   return buckets;
 }
@@ -1147,6 +1169,93 @@ export function recentCommentCount(authorHash: string, hours = 24): number {
   ).n;
 }
 
+export type CommentQueueItem = {
+  id: number;
+  story_id: string;
+  story_headline: string;
+  company_name: string;
+  body: string;
+  pseudonym: string;
+  created_at: string;
+  findings: Finding[];
+};
+
+/** Comments screening held — the counterpart to listQueue() for stories. Without this,
+ *  a held comment has no moderator-visible path to ever become published or removed. */
+export function listCommentQueue(): CommentQueueItem[] {
+  const rows = db()
+    .prepare(
+      `SELECT c.id, c.story_id, s.headline AS story_headline, co.name AS company_name,
+              c.body, c.author_hash, c.created_at, c.findings AS raw_findings
+       FROM comments c
+       JOIN stories s ON s.id = c.story_id
+       JOIN companies co ON co.id = s.company_id
+       WHERE c.status = 'review'
+       ORDER BY c.created_at ASC`,
+    )
+    .all() as {
+    id: number;
+    story_id: string;
+    story_headline: string;
+    company_name: string;
+    body: string;
+    author_hash: string;
+    created_at: string;
+    raw_findings: string;
+  }[];
+  return rows.map((r) => ({
+    id: r.id,
+    story_id: r.story_id,
+    story_headline: r.story_headline,
+    company_name: r.company_name,
+    body: r.body,
+    pseudonym: pseudonymFor(r.author_hash),
+    created_at: r.created_at,
+    findings: parseFindings(r.raw_findings).filter((f) => f.action === "flag"),
+  }));
+}
+
+export function commentQueueSize(): number {
+  return (
+    db().prepare(`SELECT COUNT(*) AS n FROM comments WHERE status = 'review'`).get() as { n: number }
+  ).n;
+}
+
+/**
+ * Publishes or removes a held comment. Mirrors moderate() for stories: removal needs a
+ * written reason, enforced here rather than only at the API route, for the same reason
+ * moderate() enforces it here — any caller going through this function is the one
+ * guarantee the audit log can rely on.
+ */
+export function moderateComment(
+  commentId: number,
+  action: "approve" | "remove",
+  note?: string | null,
+): { ok: boolean; status?: string; error?: string } {
+  if (action === "remove" && !note?.trim()) {
+    return { ok: false, error: "Removals need a reason — it goes in the audit log." };
+  }
+
+  const row = db().prepare(`SELECT status FROM comments WHERE id = ?`).get(commentId) as
+    | { status: string }
+    | undefined;
+  if (!row) return { ok: false, error: "No such comment." };
+
+  const to = action === "remove" ? "removed" : "published";
+  const tx = db().transaction(() => {
+    db().prepare(`UPDATE comments SET status = ? WHERE id = ?`).run(to, commentId);
+    db()
+      .prepare(
+        `INSERT INTO comment_moderation_log (comment_id, action, note, from_status, to_status)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(commentId, action, note ?? null, row.status, to);
+  });
+  tx();
+
+  return { ok: true, status: to };
+}
+
 /* ── Follows ───────────────────────────────────────────────────────────────────
  *
  * follower_id is an opaque random token in a cookie (src/lib/follows.ts), not derived
@@ -1157,6 +1266,12 @@ export function recentCommentCount(authorHash: string, hours = 24): number {
  * exists for.
  */
 
+// No rate limit here on purpose: follows are keyed on the per-device follower cookie,
+// not requesterHash, and coupling this to IP-based throttling would reintroduce the
+// fingerprinting surface follows were deliberately kept separate from. A follow row is
+// two integers and idempotent to insert — the growth this could produce is bounded by
+// how many company pages a single browser can click "Follow" on, which is not a threat
+// worth the coupling.
 export function follow(followerId: string, companySlug: string): { ok: boolean } {
   const company = getCompanyBySlug(companySlug);
   if (!company) return { ok: false };

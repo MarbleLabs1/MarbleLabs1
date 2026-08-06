@@ -54,7 +54,7 @@ deliberate choice, not an oversight.
 |---|---|---|
 | What counts as a reason | `src/lib/taxonomy.ts` | Free-text rants are cathartic and worthless as data. The taxonomy is what makes this sellable. Codes are append-only — renaming one shifts every historical aggregate. |
 | What gets published | `src/lib/moderation.ts` | Runs before anything is written. Blocks named individuals and contact details; flags allegations for human review. |
-| Every SQL query | `src/lib/db.ts` | All of it, in one file, so the eventual Postgres migration is a one-file job. |
+| Every SQL query | `src/lib/db.ts` | All of it, in one file, so the eventual Postgres migration touches one file instead of hunting queries across the codebase. |
 | Pricing and entitlements | `src/lib/billing.ts` | Plans, Stripe wiring, HMAC-signed access cookies. |
 | Moderator access | `src/lib/admin-token.ts` | Token and session crypto, free of Next imports so it is unit-testable. Fails closed. |
 | Pseudonyms | `src/lib/identity.ts` | Deterministic label from a hash, never the hash itself. Two different posters can land on the same pseudonym — a "unique-looking" anonymous handle would quietly become a fingerprint. |
@@ -157,18 +157,20 @@ publishes or removes. **Removals require a written reason**, and every decision 
 indistinguishable from censorship, and the log is what you show when someone asks why their story
 went. Approving also clears the reports, or the story returns to the queue forever.
 
+Comments held by screening get the same treatment in a second section of `/admin`, decisions logged
+to `comment_moderation_log` — one queue per content type, same review discipline for both.
+
 Access is a single shared token in `LINKEDOUT_ADMIN_TOKEN`, compared in constant time, exchanged for
 an HMAC-signed 12-hour cookie. **Leave it unset and `/admin` 404s** — an admin surface with no
 password because someone forgot an env var is how moderation tools end up publicly writable. Right
 for one or two moderators; at five you want per-moderator accounts so the log records *who* decided.
 Rotating `LINKEDOUT_SALT` signs everyone out, which is the fast revoke.
 
-**Still missing before this goes live for real:** a published takedown contact, a lawyer's read of
-the guidelines in your jurisdiction, and comments in `/admin`. Comments go through the same
-`screenShort()` screening as stories — a flagged comment is held (`status='review'`) and never shown
-by `getComments()` — but the queue only lists stories right now, so a held comment has nowhere for a
-moderator to actually resolve it. Same shape of gap the story queue had before `/admin` existed;
-extending `listQueue()` to comments is the next thing to build, not a silent hole.
+**Still missing before this goes live for real:** a published takedown contact and a lawyer's read of
+the guidelines in your jurisdiction. Comments go through the same `screenShort()` screening as
+stories — a flagged comment is held (`status='review'`) and never shown by `getComments()` — and now
+has the same resolution path stories do: `/admin` lists held comments alongside held stories, with
+publish/remove actions written to `comment_moderation_log`.
 
 ---
 

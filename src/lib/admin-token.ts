@@ -25,8 +25,10 @@ export function adminEnabled(): boolean {
   return Boolean(process.env.LINKEDOUT_ADMIN_TOKEN);
 }
 
+/** LINKEDOUT_COOKIE_SECRET is preferred; LINKEDOUT_SALT is the fallback — see anonHash()
+ *  in db.ts for why keeping this separate from the hashing key matters. */
 function signingKey(): string {
-  return process.env.LINKEDOUT_SALT ?? "dev-salt-change-me";
+  return process.env.LINKEDOUT_COOKIE_SECRET ?? process.env.LINKEDOUT_SALT ?? "dev-salt-change-me";
 }
 
 /** Constant-time compare, so a wrong token cannot be discovered one character at a time. */

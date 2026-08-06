@@ -106,7 +106,8 @@ export function CommentSection({
             maxLength={600}
             required
             minLength={2}
-            className="min-h-16 w-full resize-y rounded-md border border-line bg-ink-2 px-3 py-2 text-sm placeholder:text-muted/70 focus:border-acid focus:outline-none"
+            disabled={busy}
+            className="min-h-16 w-full resize-y rounded-md border border-line bg-ink-2 px-3 py-2 text-sm placeholder:text-muted/70 focus:border-acid focus:outline-none disabled:opacity-60"
           />
           {error && <p className="mt-1.5 text-xs text-alarm">{error}</p>}
           {held && (

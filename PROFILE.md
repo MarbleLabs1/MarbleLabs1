@@ -41,7 +41,7 @@ I'm a passionate developer focused on creating innovative solutions at the inter
 
 ## 📊 Tech Stack
 
-```
+```text
 Languages:  Python • TypeScript • Shell • Bash
 Blockchain: Ethereum • Smart Contracts • Web3.py • Solidity
 AI/ML:      TensorFlow • PyTorch • Ollama • LLMs
