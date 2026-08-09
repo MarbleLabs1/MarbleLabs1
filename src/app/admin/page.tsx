@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { adminEnabled, isModerator } from "@/lib/admin";
-import { commentQueueSize, listCommentQueue, listQueue, queueSize, recentDecisions } from "@/lib/db";
+import { listCommentQueue, listQueue, recentCommentDecisions, recentDecisions } from "@/lib/db";
 import { reasonLabel, tenureLabel } from "@/lib/taxonomy";
 import { relativeTime } from "@/lib/format";
 import { LoginForm } from "./LoginForm";
@@ -45,6 +45,7 @@ export default async function AdminPage() {
   const queue = listQueue();
   const commentQueue = listCommentQueue();
   const decisions = recentDecisions(15);
+  const commentDecisions = recentCommentDecisions(15);
 
   return (
     <>
@@ -189,9 +190,59 @@ export default async function AdminPage() {
         )}
       </section>
 
+      <section className="mt-12">
+        <h2 className="label-xs">Comment audit log — last {commentDecisions.length || 0} decisions</h2>
+        {commentDecisions.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">No comment decisions recorded yet.</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="label-xs border-b border-line text-left">
+                  <th className="py-2 pr-4">When</th>
+                  <th className="py-2 pr-4">Action</th>
+                  <th className="py-2 pr-4">On</th>
+                  <th className="py-2">Reason given</th>
+                </tr>
+              </thead>
+              <tbody>
+                {commentDecisions.map((d) => (
+                  <tr key={d.id} className="border-b border-line/60">
+                    <td className="py-2 pr-4 font-mono text-xs text-muted">
+                      {relativeTime(d.created_at)}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <span
+                        className={`font-mono text-xs ${
+                          d.action === "remove" ? "text-alarm" : "text-acid"
+                        }`}
+                      >
+                        {d.action}
+                      </span>
+                      <span className="ml-2 font-mono text-[11px] text-muted">
+                        {d.from_status} → {d.to_status}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4">
+                      <Link href={`/stories/${d.story_id}`} className="hover:text-acid">
+                        {d.body.length > 60 ? `${d.body.slice(0, 60)}…` : d.body}
+                      </Link>
+                      <span className="ml-2 font-mono text-[11px] text-muted">
+                        {d.story_headline} · {d.company_name}
+                      </span>
+                    </td>
+                    <td className="py-2 text-muted">{d.note ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       <p className="mt-8 font-mono text-[11px] text-muted">
-        {queueSize()} stories · {commentQueueSize()} comments in queue · session expires 12h after
-        sign-in
+        {queue.length} stories · {commentQueue.length} comments in queue · session expires 12h
+        after sign-in
       </p>
     </>
   );

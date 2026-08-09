@@ -175,7 +175,11 @@ export function QueueItemCard({ item }: { item: QueueCardItem }) {
             disabled={busy !== null}
             className="rounded-md bg-acid px-4 py-2 text-sm font-semibold text-ink disabled:opacity-40"
           >
-            {busy ? "Working…" : item.status === "published" ? "Keep it up, clear reports" : "Publish it"}
+            {busy === "approve" || busy === "restore"
+              ? "Working…"
+              : item.status === "published"
+                ? "Keep it up, clear reports"
+                : "Publish it"}
           </button>
           <button
             type="button"
@@ -183,7 +187,7 @@ export function QueueItemCard({ item }: { item: QueueCardItem }) {
             disabled={busy !== null}
             className="rounded-md border border-alarm/60 px-4 py-2 text-sm font-semibold text-alarm hover:bg-alarm/10 disabled:opacity-40"
           >
-            Remove
+            {busy === "remove" ? "Working…" : "Remove"}
           </button>
           <Link
             href={`/stories/${item.id}`}

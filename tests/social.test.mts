@@ -171,6 +171,53 @@ test("newStoriesSinceFollow counts only stories published after the follow, not 
   assert.equal(D.newStoriesSinceFollow(follower, company.slug), 1);
 });
 
+test("moderateComment reports a missing comment as not-found, not a generic conflict", () => {
+  const result = D.moderateComment(999999, "approve");
+  assert.equal(result.ok, false);
+  assert.equal(result.notFound, true);
+});
+
+test("moderateComment publishes a held comment and logs the decision", () => {
+  makeStory("social5");
+  const id = D.insertComment({
+    story_id: "social5",
+    body: "held comment for the audit log test",
+    status: "review",
+    findings: [{ action: "flag", code: "allegation", message: "x" }],
+    author_hash: D.anonHash("commenter-6"),
+  });
+
+  const result = D.moderateComment(id, "approve");
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "published");
+
+  const logged = D.recentCommentDecisions(50).find((d) => d.comment_id === id);
+  assert.ok(logged, "the decision must show up in the comment audit log");
+  assert.equal(logged.action, "approve");
+  assert.equal(logged.from_status, "review");
+  assert.equal(logged.to_status, "published");
+  assert.equal(logged.story_id, "social5");
+});
+
+test("moderateComment removing without a note is rejected and logs nothing", () => {
+  makeStory("social6");
+  const id = D.insertComment({
+    story_id: "social6",
+    body: "another held comment",
+    status: "review",
+    findings: [{ action: "flag", code: "allegation", message: "x" }],
+    author_hash: D.anonHash("commenter-7"),
+  });
+
+  const result = D.moderateComment(id, "remove");
+  assert.equal(result.ok, false);
+  assert.equal(D.recentCommentDecisions(50).some((d) => d.comment_id === id), false);
+
+  const removed = D.moderateComment(id, "remove", "unverifiable allegation");
+  assert.equal(removed.ok, true);
+  assert.equal(removed.status, "removed");
+});
+
 test("Story objects carry a pseudonym and never the raw author_hash", () => {
   const story = D.getStory("social1");
   assert.ok(story);

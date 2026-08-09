@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const result = moderateComment(commentId, action, note ?? null);
-  if (!result.ok) return json({ error: result.error }, 409);
+  if (!result.ok) return json({ error: result.error }, result.notFound ? 404 : 409);
 
   return json({ ok: true, status: result.status });
 }

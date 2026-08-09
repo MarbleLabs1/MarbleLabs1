@@ -10,7 +10,11 @@ function withNodeEnv<T>(value: string, fn: () => T): T {
   try {
     return fn();
   } finally {
-    Object.assign(process.env, { NODE_ENV: prev });
+    // Object.assign stringifies undefined to "undefined" instead of leaving the key
+    // absent — delete it outright when there was nothing to restore. NODE_ENV is typed
+    // read-only, same reason Object.assign is used above instead of a direct set.
+    if (prev === undefined) delete (process.env as Record<string, string | undefined>).NODE_ENV;
+    else Object.assign(process.env, { NODE_ENV: prev });
   }
 }
 

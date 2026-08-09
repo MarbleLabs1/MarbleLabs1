@@ -119,7 +119,7 @@ export function CommentQueueCard({ item }: { item: CommentQueueCardItem }) {
             disabled={busy !== null}
             className="rounded-md bg-acid px-4 py-2 text-sm font-semibold text-ink disabled:opacity-40"
           >
-            {busy ? "Working…" : "Publish it"}
+            {busy === "approve" ? "Working…" : "Publish it"}
           </button>
           <button
             type="button"
@@ -127,7 +127,7 @@ export function CommentQueueCard({ item }: { item: CommentQueueCardItem }) {
             disabled={busy !== null}
             className="rounded-md border border-alarm/60 px-4 py-2 text-sm font-semibold text-alarm hover:bg-alarm/10 disabled:opacity-40"
           >
-            Remove
+            {busy === "remove" ? "Working…" : "Remove"}
           </button>
         </div>
       </div>

@@ -44,7 +44,11 @@ export async function POST(req: Request) {
     return json({ mode: "stripe", redirect: url });
   }
 
-  if (process.env.LINKEDOUT_DEMO_UNLOCK === "1") {
+  // NODE_ENV check is deliberate, not a formality: the .env.example warning ("never set
+  // this in production") only works if nobody ever makes that mistake. This makes the
+  // mistake harmless instead — a stray LINKEDOUT_DEMO_UNLOCK=1 on a real deployment stops
+  // granting free entitlements the moment NODE_ENV says production.
+  if (process.env.LINKEDOUT_DEMO_UNLOCK === "1" && process.env.NODE_ENV !== "production") {
     return new Response(
       JSON.stringify({
         mode: "demo",

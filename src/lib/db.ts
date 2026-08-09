@@ -1233,7 +1233,7 @@ export function moderateComment(
   commentId: number,
   action: "approve" | "remove",
   note?: string | null,
-): { ok: boolean; status?: string; error?: string } {
+): { ok: boolean; status?: string; error?: string; notFound?: boolean } {
   if (action === "remove" && !note?.trim()) {
     return { ok: false, error: "Removals need a reason — it goes in the audit log." };
   }
@@ -1241,7 +1241,7 @@ export function moderateComment(
   const row = db().prepare(`SELECT status FROM comments WHERE id = ?`).get(commentId) as
     | { status: string }
     | undefined;
-  if (!row) return { ok: false, error: "No such comment." };
+  if (!row) return { ok: false, error: "No such comment.", notFound: true };
 
   const to = action === "remove" ? "removed" : "published";
   const tx = db().transaction(() => {
@@ -1256,6 +1256,37 @@ export function moderateComment(
   tx();
 
   return { ok: true, status: to };
+}
+
+export type CommentLogEntry = {
+  id: number;
+  comment_id: number;
+  action: string;
+  note: string | null;
+  from_status: string;
+  to_status: string;
+  created_at: string;
+  body: string;
+  story_id: string;
+  story_headline: string;
+  company_name: string;
+};
+
+/** recentDecisions()'s counterpart for comment_moderation_log — same shape of audit
+ *  trail, so /admin can render both under one "the decision happened, here it is"
+ *  section instead of leaving comment decisions logged somewhere no page shows. */
+export function recentCommentDecisions(limit = 20): CommentLogEntry[] {
+  return db()
+    .prepare(
+      `SELECT l.id, l.comment_id, l.action, l.note, l.from_status, l.to_status, l.created_at,
+              c.body, c.story_id, s.headline AS story_headline, co.name AS company_name
+       FROM comment_moderation_log l
+       JOIN comments c ON c.id = l.comment_id
+       JOIN stories s ON s.id = c.story_id
+       JOIN companies co ON co.id = s.company_id
+       ORDER BY l.created_at DESC, l.id DESC LIMIT ?`,
+    )
+    .all(limit) as CommentLogEntry[];
 }
 
 /* ── Follows ───────────────────────────────────────────────────────────────────
