@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { initialsFor, initialsFromPseudonym, pseudonymFor } from "../src/lib/identity.ts";
+import { avatarGradientFor, initialsFor, initialsFromPseudonym, pseudonymFor } from "../src/lib/identity.ts";
 
 test("the same hash always gets the same pseudonym", () => {
   const a = pseudonymFor("abc123");
@@ -26,4 +26,14 @@ test("initialsFor matches initialsFromPseudonym for the same hash", () => {
 test("initials are two uppercase letters", () => {
   const initials = initialsFor("any-hash-value");
   assert.match(initials, /^[A-Z]{2}$/);
+});
+
+test("avatarGradientFor is deterministic for the same pseudonym", () => {
+  const name = pseudonymFor("gradient-check");
+  assert.equal(avatarGradientFor(name), avatarGradientFor(name));
+});
+
+test("avatarGradientFor returns a two-stop CSS linear-gradient", () => {
+  const gradient = avatarGradientFor("Weary Engineer #0001");
+  assert.match(gradient, /^linear-gradient\(135deg, hsl\(\d+ 85% 55%\), hsl\(\d+ 85% 50%\)\)$/);
 });

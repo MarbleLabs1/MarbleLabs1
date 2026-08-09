@@ -2,18 +2,23 @@
 
 import { useState } from "react";
 import { relativeTime } from "@/lib/format";
-import { initialsFromPseudonym } from "@/lib/identity";
+import { avatarGradientFor, initialsFromPseudonym } from "@/lib/identity";
 
 export type CommentDTO = { id: number; body: string; created_at: string; pseudonym: string };
 
+const MAX_COMMENT = 600;
+
 function Avatar({ pseudonym }: { pseudonym: string }) {
   return (
-    <div
+    <span
       aria-hidden
-      className="grid size-7 shrink-0 place-items-center rounded-full bg-line font-mono text-[10px] text-muted"
+      className="grid size-7 shrink-0 place-items-center rounded-full p-[1.5px]"
+      style={{ backgroundImage: avatarGradientFor(pseudonym) }}
     >
-      {initialsFromPseudonym(pseudonym)}
-    </div>
+      <span className="grid size-full place-items-center rounded-full bg-ink font-mono text-[10px] text-paper">
+        {initialsFromPseudonym(pseudonym)}
+      </span>
+    </span>
   );
 }
 
@@ -103,12 +108,19 @@ export function CommentSection({
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Add a comment — roles only, no names, no contact details."
-            maxLength={600}
+            maxLength={MAX_COMMENT}
             required
             minLength={2}
             disabled={busy}
             className="min-h-16 w-full resize-y rounded-md border border-line bg-ink-2 px-3 py-2 text-sm placeholder:text-muted/70 focus:border-acid focus:outline-none disabled:opacity-60"
           />
+          <p
+            className={`mt-1 text-right font-mono text-[11px] ${
+              MAX_COMMENT - body.length < 40 ? "text-ember" : "text-muted"
+            }`}
+          >
+            {MAX_COMMENT - body.length}
+          </p>
           {error && <p className="mt-1.5 text-xs text-alarm">{error}</p>}
           {held && (
             <p className="mt-1.5 text-xs text-ember">

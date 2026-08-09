@@ -46,3 +46,17 @@ export function initialsFromPseudonym(pseudonym: string): string {
   const [mood, role] = pseudonym.split(" ");
   return `${mood?.[0] ?? "?"}${role?.[0] ?? ""}`;
 }
+
+/**
+ * A two-stop gradient for an avatar ring, derived from the pseudonym string alone —
+ * plain string hashing, not anonHash(), because this is decoration, not identity. Same
+ * pseudonym always gets the same colours, which is what makes the feed and the stories
+ * bar read as one person's avatar rather than a new circle every time it renders.
+ */
+export function avatarGradientFor(pseudonym: string): string {
+  let h = 0;
+  for (let i = 0; i < pseudonym.length; i++) h = (h * 31 + pseudonym.charCodeAt(i)) >>> 0;
+  const hue1 = h % 360;
+  const hue2 = (hue1 + 55) % 360;
+  return `linear-gradient(135deg, hsl(${hue1} 85% 55%), hsl(${hue2} 85% 50%))`;
+}

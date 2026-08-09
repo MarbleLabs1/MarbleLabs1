@@ -35,7 +35,7 @@ export function ShareButton({ url, title }: { url: string; title: string }) {
       onClick={share}
       className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 font-mono text-xs text-muted transition-colors hover:border-acid hover:text-acid"
     >
-      <span aria-hidden>{state === "copied" ? "✓" : "↗"}</span>
+      <span aria-hidden>{state === "copied" ? "✓" : "⟲"}</span>
       <span>{state === "copied" ? "link copied" : "share"}</span>
     </button>
   );

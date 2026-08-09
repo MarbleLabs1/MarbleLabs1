@@ -5,7 +5,7 @@ import { EchoButton } from "./EchoButton";
 import { ReceiptCard } from "./ReceiptCard";
 import { ShareButton } from "./ShareButton";
 import { relativeTime } from "@/lib/format";
-import { initialsFromPseudonym } from "@/lib/identity";
+import { avatarGradientFor, initialsFromPseudonym } from "@/lib/identity";
 
 function SeverityBar({ value }: { value: number }) {
   return (
@@ -42,12 +42,15 @@ export function ReasonChip({ code }: { code: string }) {
 function PostHeader({ story }: { story: Story }) {
   return (
     <div className="flex items-start gap-2.5">
-      <div
+      <span
         aria-hidden
-        className="grid size-9 shrink-0 place-items-center rounded-full bg-line font-mono text-[11px] text-muted"
+        className="grid size-9 shrink-0 place-items-center rounded-full p-[2px]"
+        style={{ backgroundImage: avatarGradientFor(story.pseudonym) }}
       >
-        {initialsFromPseudonym(story.pseudonym)}
-      </div>
+        <span className="grid size-full place-items-center rounded-full bg-ink font-mono text-[11px] text-paper">
+          {initialsFromPseudonym(story.pseudonym)}
+        </span>
+      </span>
       <div className="min-w-0">
         <p className="text-sm font-semibold leading-tight">{story.pseudonym}</p>
         <p className="mt-0.5 label-xs">

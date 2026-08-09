@@ -1,9 +1,18 @@
 import Link from "next/link";
-import { commentCounts, firstReceipts, globalStats, listStories, receiptCounts, receiptWall } from "@/lib/db";
-import { REASONS, ROLE_FAMILIES, reasonLabel } from "@/lib/taxonomy";
+import {
+  commentCounts,
+  firstReceipts,
+  globalStats,
+  listCompanyStats,
+  listStories,
+  receiptCounts,
+  receiptWall,
+} from "@/lib/db";
+import { REASON_MAP, REASONS, ROLE_FAMILIES, reasonLabel } from "@/lib/taxonomy";
 import { StoryCard } from "@/components/StoryCard";
+import { StoriesBar } from "@/components/StoriesBar";
 import { ReceiptCard } from "@/components/ReceiptCard";
-import { pct } from "@/lib/format";
+import { indexBand, pct } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +69,39 @@ function Hero({ stats }: { stats: ReturnType<typeof globalStats> }) {
   );
 }
 
+function weightFor(code: string) {
+  return REASON_MAP[code]?.weight ?? 0.5;
+}
+
+/** Twitter's "Trending" widget, aimed at the Exit Index instead of hashtags: a ranked
+ *  list is a ranked list, whether the thing being ranked is a topic or a company. */
+function Trending({ companies }: { companies: ReturnType<typeof listCompanyStats> }) {
+  if (companies.length === 0) return null;
+  return (
+    <div className="card p-5">
+      <h2 className="label-xs">Trending on the Exit Index</h2>
+      <ol className="mt-3 flex flex-col gap-3">
+        {companies.map((c, i) => (
+          <li key={c.slug}>
+            <Link href={`/companies/${c.slug}`} className="group flex items-baseline gap-2.5">
+              <span className="font-mono text-xs text-muted">{i + 1}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium group-hover:text-acid">
+                  {c.name}
+                </span>
+                <span className="label-xs">
+                  {c.story_count} {c.story_count === 1 ? "story" : "stories"} ·{" "}
+                  {indexBand(c.exit_index).label}
+                </span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -72,6 +114,11 @@ export default async function Home({
     | "severe";
   const stats = globalStats();
   const stories = listStories({ reason: sp.reason, role: sp.role, sort, limit: 30 });
+  // Ignores the feed's own filter/sort on purpose: this is "who just posted," not
+  // "who matches your current view" — the same way a stories tray does not filter
+  // itself by whatever the main timeline below it is doing.
+  const recentPosters = listStories({ sort: "recent", limit: 12 });
+  const trending = listCompanyStats(weightFor, { limit: 5 });
   const ids = stories.map((s) => s.id);
   const counts = receiptCounts(ids);
   const cComments = commentCounts(ids);
@@ -89,6 +136,8 @@ export default async function Home({
   return (
     <>
       <Hero stats={stats} />
+
+      <StoriesBar stories={recentPosters} />
 
       {wall.length > 0 && (
         <section className="mb-10">
@@ -187,6 +236,8 @@ export default async function Home({
         </div>
 
         <aside className="flex flex-col gap-6">
+          <Trending companies={trending} />
+
           <div className="card p-5">
             <h2 className="label-xs">Why people are leaving</h2>
             <ul className="mt-3 flex flex-col gap-2">
