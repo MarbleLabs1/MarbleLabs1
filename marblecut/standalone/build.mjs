@@ -14,6 +14,7 @@ const run = promisify(execFile);
 const ROOT = new URL('..', import.meta.url).pathname;
 const OUT_DIR = `${ROOT}dist-standalone/`;
 const OUT_FILE = `${OUT_DIR}marblecut.html`;
+const FRAGMENT_FILE = `${OUT_DIR}marblecut.fragment.html`;
 
 /** Impede que um `</script>` dentro de uma string do bundle encerre a tag. */
 function escapeForInlineTag(code) {
@@ -51,12 +52,41 @@ const [css, js] = await Promise.all([
   readFile(`${OUT_DIR}bundle.js`, 'utf8'),
 ]);
 
-const html = `<title>MarbleCut — Editor de vídeo online</title>
-<style>${escapeForInlineTag(css)}</style>
-<div id="root"></div>
-<script>${escapeForInlineTag(js)}</script>
+const inlineCss = `<style>${escapeForInlineTag(css)}</style>`;
+const inlineJs = `<script>${escapeForInlineTag(js)}</script>`;
+const body = `<div id="root"></div>`;
+
+// Documento completo: é o que abre por file://, pendrive ou hospedagem estática.
+// O charset é obrigatório aqui — sem ele os acentos da interface quebram.
+const standalone = `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#08090c" />
+<meta name="description" content="Editor de vídeo que roda no navegador: corta, enquadra em 9:16 e exporta MP4. O vídeo não sai do seu aparelho." />
+<title>MarbleCut — Editor de vídeo online</title>
+${inlineCss}
+</head>
+<body>
+${body}
+${inlineJs}
+</body>
+</html>
 `;
 
-await writeFile(OUT_FILE, html);
-const { size } = await stat(OUT_FILE);
-console.log(`✓ ${OUT_FILE} — ${(size / 1024 / 1024).toFixed(2)} MB`);
+// Fragmento: hospedagens que já fornecem o esqueleto do documento injetam só
+// isto, então doctype/html/head/body seriam duplicados.
+const fragment = `<title>MarbleCut — Editor de vídeo online</title>
+${inlineCss}
+${body}
+${inlineJs}
+`;
+
+await writeFile(OUT_FILE, standalone);
+await writeFile(FRAGMENT_FILE, fragment);
+
+for (const file of [OUT_FILE, FRAGMENT_FILE]) {
+  const { size } = await stat(file);
+  console.log(`✓ ${file} — ${(size / 1024 / 1024).toFixed(2)} MB`);
+}
