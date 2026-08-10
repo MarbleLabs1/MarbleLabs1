@@ -38,6 +38,18 @@ npm run build && npm run start   # produção
 npm run typecheck                # tsc --noEmit
 ```
 
+### Arquivo único
+
+Como o app não tem backend, ele também empacota num único HTML sem nenhuma
+dependência externa — CSS e JS embutidos inline:
+
+```bash
+npm run build:standalone   # dist-standalone/marblecut.html (~0,8 MB)
+```
+
+O resultado abre por `file://`, de um pendrive ou de qualquer hospedagem
+estática, e funciona offline depois de carregado.
+
 ## O que dá para fazer
 
 **Corte e ritmo** — linha do tempo com múltiplos clipes, aparar arrastando as
