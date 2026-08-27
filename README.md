@@ -30,12 +30,12 @@ I'm a passionate developer focused on creating innovative solutions at the inter
 
       | Project | Description | Tech Stack |
       |---------|-------------|------------|
-      | **macos-theme-for-linux** | Professional macOS-inspired Linux desktop environment | Shell, Linux customization |
-      | **code-wizard-ollama-ai** | AI-powered code assistant leveraging local LLMs | TypeScript, Ollama, AI |
-      | **IOS-emulator** | Cross-platform iOS app testing without Xcode costs | Shell, QEMU |
-      | **Marble_Blockchain** | Blockchain infrastructure and protocol research | Python, Cryptography |
-      | **C0lornote** | Privacy-focused note-taking application | Python, Desktop App |
-      | **DJset-python** | Audio processing and DJ toolkit | Python, DSP |
+      | [Marble_Blockchain](https://github.com/MarbleLabs1/Marble_Blockchain) | Source of the Marble Blockchain chain and DEX — live at marbleblockchain.homelinux.com | Python, Smart Contracts |
+      | [firex-exchange](https://github.com/MarbleLabs1/firex-exchange) | Marble Blockchain exchange prototype: PyQt6 desktop client, DEX, wallet tools | Python, PyQt6 |
+      | [MarbleToken](https://github.com/MarbleLabs1/MarbleToken) | Native token of the MARBLE Blockchain — spec, tokenomics, dApp docs | Web3, Tokenomics |
+      | [marblepyth](https://github.com/MarbleLabs1/marblepyth) | Pyth Network price feed client for Marble Blockchain services | Python, Oracle |
+      | [cosmic-marble-dex](https://github.com/MarbleLabs1/cosmic-marble-dex) | Customer-centric blockchain DEX for wallet transactions and token swaps | React, TypeScript |
+      | [code-wizard-ollama-ai](https://github.com/MarbleLabs1/code-wizard-ollama-ai) | AI-powered code assistant leveraging local LLMs | TypeScript, Ollama, AI |
 
       ---
 
@@ -65,6 +65,7 @@ I'm a passionate developer focused on creating innovative solutions at the inter
             - 🌐 **Portfolio**: https://marbleceo.homelinux.com/
             - - 🪙 **Main Project — Marble Blockchain**: https://marbleblockchain.homelinux.com/
               - - 💻 **MuxCode Portal**: https://muxcode.dnsdojo.com/portalmuxcode/home
+                - - 🐦 **X (Twitter)**: https://x.com/MarbleLabs1
             - - 📧 **Interests**: Blockchain development, AI integration, open-source contributions
               - - 🤝 **Open to**: Partnerships, collaborations, and interesting projects
                
@@ -72,8 +73,8 @@ I'm a passionate developer focused on creating innovative solutions at the inter
 
                 ## 📈 Stats
 
-                ![GitHub Stats](https://img.shields.io/badge/Repositories-30+-blue?style=flat-square)
-                ![GitHub Stars](https://img.shields.io/badge/Stars-13+-yellow?style=flat-square)
+                ![GitHub Stats](https://github-readme-stats.vercel.app/api?username=MarbleLabs1&show_icons=true&theme=dark&hide_border=true)
+                ![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=MarbleLabs1&layout=compact&theme=dark&hide_border=true)
                 ![Focus](https://img.shields.io/badge/Focus-Web3%20%26%20AI-green?style=flat-square)
 
                 ---
