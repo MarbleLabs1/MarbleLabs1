@@ -63,6 +63,8 @@ I'm a passionate developer focused on creating innovative solutions at the inter
             ## 💼 Let's Collaborate
 
             - 🌐 **Portfolio**: https://marbleceo.homelinux.com/
+            - - 🪙 **Main Project — Marble Blockchain**: https://marbleblockchain.homelinux.com/
+              - - 💻 **MuxCode Portal**: https://muxcode.dnsdojo.com/portalmuxcode/home
             - - 📧 **Interests**: Blockchain development, AI integration, open-source contributions
               - - 🤝 **Open to**: Partnerships, collaborations, and interesting projects
                
