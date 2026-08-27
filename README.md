@@ -73,9 +73,9 @@ I'm a passionate developer focused on creating innovative solutions at the inter
 
                 ## 📈 Stats
 
-                ![GitHub Stats](https://github-readme-stats.vercel.app/api?username=MarbleLabs1&show_icons=true&theme=dark&hide_border=true)
-                ![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=MarbleLabs1&layout=compact&theme=dark&hide_border=true)
-                ![Focus](https://img.shields.io/badge/Focus-Web3%20%26%20AI-green?style=flat-square)
+![GitHub Stats](https://img.shields.io/badge/Repositories-32-blue?style=flat-square)
+![GitHub Stars](https://img.shields.io/badge/Stars-11+-yellow?style=flat-square)
+![Focus](https://img.shields.io/badge/Focus-Web3%20%26%20AI-green?style=flat-square)
 
                 ---
 
