@@ -20,69 +20,69 @@ I'm a passionate developer focused on creating innovative solutions at the inter
 ### 🎯 Core Competencies
 
 - **Blockchain Development**: Smart contracts, DeFi protocols, consensus mechanisms
-- - **AI/ML Engineering**: Neural networks, data analysis, algorithmic optimization
-  - - **Backend Systems**: Python, TypeScript, distributed architecture design
-    - - **DevOps & Infrastructure**: Docker, Linux systems, cloud deployment
-     
-      - ---
+- **AI/ML Engineering**: Neural networks, data analysis, algorithmic optimization
+- **Backend Systems**: Python, TypeScript, distributed architecture design
+- **DevOps & Infrastructure**: Docker, Linux systems, cloud deployment
 
-      ## 🚀 Featured Projects
+---
 
-      | Project | Description | Tech Stack |
-      |---------|-------------|------------|
-      | [Marble_Blockchain](https://github.com/MarbleLabs1/Marble_Blockchain) | Source of the Marble Blockchain chain and DEX — live at marbleblockchain.homelinux.com | Python, Smart Contracts |
-      | [firex-exchange](https://github.com/MarbleLabs1/firex-exchange) | Marble Blockchain exchange prototype: PyQt6 desktop client, DEX, wallet tools | Python, PyQt6 |
-      | [MarbleToken](https://github.com/MarbleLabs1/MarbleToken) | Native token of the MARBLE Blockchain — spec, tokenomics, dApp docs | Web3, Tokenomics |
-      | [marblepyth](https://github.com/MarbleLabs1/marblepyth) | Pyth Network price feed client for Marble Blockchain services | Python, Oracle |
-      | [cosmic-marble-dex](https://github.com/MarbleLabs1/cosmic-marble-dex) | Customer-centric blockchain DEX for wallet transactions and token swaps | React, TypeScript |
-      | [code-wizard-ollama-ai](https://github.com/MarbleLabs1/code-wizard-ollama-ai) | AI-powered code assistant leveraging local LLMs | TypeScript, Ollama, AI |
+## 🚀 Featured Projects
 
-      ---
+| Project | Description | Tech Stack |
+|---------|-------------|------------|
+| [Marble_Blockchain](https://github.com/MarbleLabs1/Marble_Blockchain) | Source of the Marble Blockchain chain and DEX — live at marbleblockchain.homelinux.com | Python, Smart Contracts |
+| [firex-exchange](https://github.com/MarbleLabs1/firex-exchange) | Marble Blockchain exchange prototype: PyQt6 desktop client, DEX, wallet tools | Python, PyQt6 |
+| [MarbleToken](https://github.com/MarbleLabs1/MarbleToken) | Native token of the MARBLE Blockchain — spec, tokenomics, dApp docs | Web3, Tokenomics |
+| [marblepyth](https://github.com/MarbleLabs1/marblepyth) | Pyth Network price feed client for Marble Blockchain services | Python, Oracle |
+| [cosmic-marble-dex](https://github.com/MarbleLabs1/cosmic-marble-dex) | Customer-centric blockchain DEX for wallet transactions and token swaps | React, TypeScript |
+| [code-wizard-ollama-ai](https://github.com/MarbleLabs1/code-wizard-ollama-ai) | AI-powered code assistant leveraging local LLMs | TypeScript, Ollama, AI |
 
-      ## 📊 Tech Stack
+---
 
-      ```
-      Languages:  Python • TypeScript • Shell • Bash
-      Blockchain: Ethereum • Smart Contracts • Web3.py • Solidity
-      AI/ML:      TensorFlow • PyTorch • Ollama • LLMs
-      Tools:      Git • Docker • Linux • VS Code • GitHub
-      Frameworks: Node.js • FastAPI • Flask
-      ```
+## 📊 Tech Stack
 
-      ---
+```
+Languages: Python • TypeScript • Shell • Bash
+Blockchain: Ethereum • Smart Contracts • Web3.py • Solidity
+AI/ML: TensorFlow • PyTorch • Ollama • LLMs
+Tools: Git • Docker • Linux • VS Code • GitHub
+Frameworks: Node.js • FastAPI • Flask
+```
 
-      ## 🌱 Currently
+---
 
-      - 🔍 Researching advanced blockchain consensus mechanisms
-      - - 🤖 Building AI-powered developer tools
-        - - 📚 Contributing to open-source blockchain projects
-          - - 🌍 Exploring decentralized infrastructure solutions
-           
-            - ---
+## 🌱 Currently
 
-            ## 💼 Let's Collaborate
+- 🔍 Researching advanced blockchain consensus mechanisms
+- 🤖 Building AI-powered developer tools
+- 📚 Contributing to open-source blockchain projects
+- 🌍 Exploring decentralized infrastructure solutions
 
-            - 🌐 **Portfolio**: https://marbleceo.homelinux.com/
-            - - 🪙 **Main Project — Marble Blockchain**: https://marbleblockchain.homelinux.com/
-              - - 💻 **MuxCode Portal**: https://muxcode.dnsdojo.com/portalmuxcode/home
-                - - 🐦 **X (Twitter)**: https://x.com/MarbleLabs1
-            - - 📧 **Interests**: Blockchain development, AI integration, open-source contributions
-              - - 🤝 **Open to**: Partnerships, collaborations, and interesting projects
-               
-                - ---
+---
 
-                ## 📈 Stats
+## 💼 Let's Collaborate
+
+- 🌐 **Portfolio**: https://marbleceo.homelinux.com/
+- 🪙 **Main Project — Marble Blockchain**: https://marbleblockchain.homelinux.com/
+- 💻 **MuxCode Portal**: https://muxcode.dnsdojo.com/portalmuxcode/home
+- 🐦 **X (Twitter)**: https://x.com/MarbleLabs1
+- 📧 **Interests**: Blockchain development, AI integration, open-source contributions
+- 🤝 **Open to**: Partnerships, collaborations, and interesting projects
+
+---
+
+## 📈 Stats
 
 ![GitHub Stats](https://img.shields.io/badge/Repositories-32-blue?style=flat-square)
 ![GitHub Stars](https://img.shields.io/badge/Stars-11+-yellow?style=flat-square)
 ![Focus](https://img.shields.io/badge/Focus-Web3%20%26%20AI-green?style=flat-square)
 
-                ---
+---
 
-                <div align="center">
+<div align="center">
 
-                **Let's build the future together! 🚀**
+**Let's build the future together! 🚀**
 
-                *Crafting innovative solutions one commit at a time*
+*Crafting innovative solutions one commit at a time*
 
-                </div>
+</div>
